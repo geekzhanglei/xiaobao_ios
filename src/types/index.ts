@@ -17,4 +17,5 @@ export interface LearningState {
   limit: number; // 600秒（10分钟）
   locked: boolean; // 是否锁定
   lastPlayTime?: number; // 上次播放时间戳
+  themeColor: string; // 背景颜色
 }

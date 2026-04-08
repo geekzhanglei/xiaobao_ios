@@ -5,18 +5,21 @@ import { Lock } from "lucide-react-native";
 import { ParentGate } from "./ParentGate";
 
 export const LockOverlay = () => {
-  const { learningState } = useStore();
+  const { learningState, setLocked } = useStore();
 
   if (!learningState.locked) return null;
 
   return (
     <View style={styles.overlay}>
-      <Lock color="#fff" size={80} />
-      <Text style={styles.title}>今天的学习结束了</Text>
-      <Text style={styles.subtitle}>请休息一下 👀</Text>
-      <ParentGate style={styles.gate}>
-        <Text style={styles.gateText}>家长管理</Text>
+      <ParentGate
+        triggerCount={5}
+        style={styles.lockContainer}
+        onTrigger={() => setLocked(false)}
+      >
+        <Lock color="#fff" size={80} />
       </ParentGate>
+      <Text style={styles.title}>今天就学习到这里了</Text>
+      <Text style={styles.subtitle}>不能再看了，请休息一下 👀</Text>
     </View>
   );
 };
@@ -29,14 +32,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     zIndex: 9999,
   },
-  gate: {
-    position: "absolute",
-    bottom: 50,
-    padding: 10,
-  },
-  gateText: {
-    color: "rgba(255, 255, 255, 0.3)",
-    fontSize: 14,
+  lockContainer: {
+    padding: 20,
   },
   title: {
     color: "#fff",

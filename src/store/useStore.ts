@@ -23,6 +23,7 @@ interface AppStore {
   // Learning State Actions
   updateTime: (delta: number) => Promise<void>;
   updateLimit: (limit: number) => Promise<void>;
+  updateThemeColor: (color: string) => Promise<void>;
   setLocked: (locked: boolean) => Promise<void>;
   resetLearningState: () => Promise<void>;
 }
@@ -35,6 +36,7 @@ export const useStore = create<AppStore>((set, get) => ({
     usedTime: 0,
     limit: 600,
     locked: false,
+    themeColor: "#121212",
   },
 
   init: async () => {
@@ -100,6 +102,13 @@ export const useStore = create<AppStore>((set, get) => ({
     if (!db) return;
     await dbActions.updateLearningState(db, { limit });
     set({ learningState: { ...learningState, limit } });
+  },
+
+  updateThemeColor: async (themeColor) => {
+    const { db, learningState } = get();
+    if (!db) return;
+    await dbActions.updateLearningState(db, { themeColor });
+    set({ learningState: { ...learningState, themeColor } });
   },
 
   setLocked: async (locked) => {

@@ -36,9 +36,7 @@ export default function PlayerScreen() {
   const [lastUpdateTime, setLastUpdateTime] = useState(0);
 
   const videoRef = useRef<Video>(null);
-  const timeUpdateInterval = useRef<ReturnType<typeof setInterval> | null>(
-    null,
-  );
+  const timeUpdateInterval = useRef<any>(null);
 
   // Auto-back timer for images (only if user doesn't interact, but here we prefer manual close for browsing)
   // Removing the auto-back timer to allow browsing
@@ -115,6 +113,13 @@ export default function PlayerScreen() {
     );
   };
 
+  const handleClose = () => {
+    if (learningState.usedTime >= learningState.limit) {
+      setLocked(true);
+    }
+    router.back();
+  };
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -134,7 +139,7 @@ export default function PlayerScreen() {
         scrollEventThrottle={16}
       />
 
-      <Pressable style={styles.closeButton} onPress={() => router.back()}>
+      <Pressable style={styles.closeButton} onPress={handleClose}>
         <X color="#fff" size={30} />
       </Pressable>
     </View>

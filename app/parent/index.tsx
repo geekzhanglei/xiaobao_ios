@@ -10,7 +10,7 @@ import {
   Alert,
   Image,
 } from "react-native";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import { useStore } from "../../src/store/useStore";
