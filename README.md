@@ -1,50 +1,54 @@
-# Welcome to your Expo app 👋
+# 小宝学习助手 (iOS Demo)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+这是一个基于 Expo 构建的儿童学习管理应用，支持家长添加视频/图片内容，并提供学习时长控制功能。
 
-## Get started
+## 🚀 快速开始
 
-1. Install dependencies
-
+1. **安装依赖**
    ```bash
-   npm install
+   pnpm install
    ```
 
-2. Start the app
-
+2. **启动项目**
    ```bash
-   npx expo start
+   pnpm dev     # 启动项目
+   pnpm run ios     # 启动 iOS 模拟器p
+   pnpm run android # 启动 Android 模拟器
    ```
 
-In the output, you'll find options to open the app in a
+## 🔐 家长端入口 (重要)
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+为了防止儿童误操作进入管理页面，应用设计了一个**隐藏入口**：
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- **位置**: 屏幕**右上角** (有一个极淡的圆形指示器)。
+- **操作**: 在 **1 秒内连续点击 4 次**。
+- **功能**: 进入后可以管理分类、上传媒体内容（图片/视频）、查看及重置学习时长。
 
-## Get a fresh project
+## 🛠️ 技术栈
 
-When you're ready, run:
+- **框架**: Expo (SDK 54) + React Native
+- **路由**: Expo Router (文件系统路由)
+- **状态管理**: Zustand
+- **持久化**: Expo SQLite (本地数据库)
+- **UI/图标**: Lucide React Native + Tailwind-like styles
 
-```bash
-npm run reset-project
-```
+## ⚠️ 常见坑点 & 注意事项
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+1. **媒体权限**:
+   - 家长端添加图片/视频需要相册和文件访问权限。在真机调试时，请确保已在系统设置中授权。
+2. **本地数据库 (SQLite)**:
+   - 所有的内容索引和学习时长都存储在本地 `kids_learning.db` 中。如果清除应用数据或重新安装，这些数据将会丢失。
+3. **缓存问题**:
+   - 项目配置了自定义缓存目录 `.expo_cache`。如果遇到奇怪的编译错误，可以尝试删除该目录后重启。
+4. **视频支持**:
+   - 视频播放依赖 `expo-av`。在某些模拟器上，视频解码可能不稳定，建议优先使用真机或图片进行测试。
+5. **锁定逻辑**:
+   - 学习时长到达限额后，应用会弹出全屏锁定层。此时只能通过右上角的“家长入口”进入管理后台进行重置。
 
-## Learn more
+## 📁 目录结构
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- `app/`: 页面路由 (首页、播放页、家长页)
+- `src/components/`: 通用 UI 组件
+- `src/database/`: SQLite 数据库操作逻辑
+- `src/store/`: Zustand 状态管理
+- `assets/`: 静态资源 (图标、启动图)
