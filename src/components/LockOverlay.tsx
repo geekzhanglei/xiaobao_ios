@@ -11,10 +11,12 @@ export const LockOverlay = () => {
 
   return (
     <View style={styles.overlay}>
-      <ParentGate />
       <Lock color="#fff" size={80} />
       <Text style={styles.title}>今天的学习结束了</Text>
       <Text style={styles.subtitle}>请休息一下 👀</Text>
+      <ParentGate style={styles.gate}>
+        <Text style={styles.gateText}>家长管理</Text>
+      </ParentGate>
     </View>
   );
 };
@@ -26,6 +28,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     zIndex: 9999,
+  },
+  gate: {
+    position: "absolute",
+    bottom: 50,
+    padding: 10,
+  },
+  gateText: {
+    color: "rgba(255, 255, 255, 0.3)",
+    fontSize: 14,
   },
   title: {
     color: "#fff",

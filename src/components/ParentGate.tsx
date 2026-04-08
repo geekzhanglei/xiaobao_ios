@@ -1,11 +1,16 @@
 import React, { useState, useRef } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
 import { useRouter } from 'expo-router';
 
-export const ParentGate = () => {
+interface ParentGateProps {
+  children?: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+}
+
+export const ParentGate = ({ children, style }: ParentGateProps) => {
   const [tapCount, setTapCount] = useState(0);
   const router = useRouter();
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleTap = () => {
     if (timerRef.current) {
@@ -25,27 +30,8 @@ export const ParentGate = () => {
   };
 
   return (
-    <Pressable style={styles.gate} onPress={handleTap}>
-      <View style={styles.indicator} />
+    <Pressable style={style} onPress={handleTap}>
+      {children}
     </Pressable>
   );
 };
-
-const styles = StyleSheet.create({
-  gate: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    width: 60,
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  indicator: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-});

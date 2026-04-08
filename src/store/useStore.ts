@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import * as SQLite from 'expo-sqlite';
-import { ContentItem, LearningState } from '../types';
-import * as dbActions from '../database/db';
+import { create } from "zustand";
+import * as SQLite from "expo-sqlite";
+import { ContentItem, LearningState } from "../types";
+import * as dbActions from "../database/db";
 
 interface AppStore {
   db: SQLite.SQLiteDatabase | null;
@@ -10,17 +10,19 @@ interface AppStore {
   learningState: LearningState;
 
   init: () => Promise<void>;
-  
+
   // Content Actions
   addContent: (item: ContentItem) => Promise<void>;
   deleteContent: (id: string) => Promise<void>;
-  
+
   // Category Actions
   addCategory: (name: string) => Promise<void>;
+  renameCategory: (oldName: string, newName: string) => Promise<void>;
   deleteCategory: (name: string) => Promise<void>;
-  
+
   // Learning State Actions
   updateTime: (delta: number) => Promise<void>;
+  updateLimit: (limit: number) => Promise<void>;
   setLocked: (locked: boolean) => Promise<void>;
   resetLearningState: () => Promise<void>;
 }
@@ -68,6 +70,15 @@ export const useStore = create<AppStore>((set, get) => ({
     set({ categories });
   },
 
+  renameCategory: async (oldName, newName) => {
+    const { db } = get();
+    if (!db) return;
+    await dbActions.updateCategory(db, oldName, newName);
+    const categories = await dbActions.getCategories(db);
+    const contents = await dbActions.getContent(db);
+    set({ categories, contents });
+  },
+
   deleteCategory: async (name) => {
     const { db } = get();
     if (!db) return;
@@ -82,6 +93,13 @@ export const useStore = create<AppStore>((set, get) => ({
     const newUsedTime = learningState.usedTime + delta;
     await dbActions.updateLearningState(db, { usedTime: newUsedTime });
     set({ learningState: { ...learningState, usedTime: newUsedTime } });
+  },
+
+  updateLimit: async (limit) => {
+    const { db, learningState } = get();
+    if (!db) return;
+    await dbActions.updateLearningState(db, { limit });
+    set({ learningState: { ...learningState, limit } });
   },
 
   setLocked: async (locked) => {

@@ -62,6 +62,15 @@ export const addCategory = async (db: SQLite.SQLiteDatabase, name: string) => {
   await db.runAsync('INSERT OR IGNORE INTO categories (name) VALUES (?)', [name]);
 };
 
+export const updateCategory = async (db: SQLite.SQLiteDatabase, oldName: string, newName: string) => {
+  await db.withTransactionAsync(async () => {
+    // 1. Update the category itself
+    await db.runAsync('UPDATE categories SET name = ? WHERE name = ?', [newName, oldName]);
+    // 2. Update all content associated with this category
+    await db.runAsync('UPDATE content SET category = ? WHERE category = ?', [newName, oldName]);
+  });
+};
+
 export const deleteCategory = async (db: SQLite.SQLiteDatabase, name: string) => {
   await db.runAsync('DELETE FROM categories WHERE name = ?', [name]);
 };

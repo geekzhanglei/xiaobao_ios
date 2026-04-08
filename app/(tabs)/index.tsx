@@ -44,9 +44,10 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ParentGate />
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>我的书架</Text>
+        <ParentGate>
+          <Text style={styles.headerTitle}>我的书架</Text>
+        </ParentGate>
       </View>
       
       {contents.length === 0 ? (
