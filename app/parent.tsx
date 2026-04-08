@@ -78,8 +78,19 @@ export default function ParentPanel() {
 
   const generateThumbnail = async (videoUri: string) => {
     try {
-      const { uri } = await VideoThumbnails.getThumbnailAsync(videoUri, {
-        time: 1000,
+      // Ensure the URI has a file:// prefix for iOS if it doesn't already
+      let localUri = videoUri;
+      if (
+        !localUri.startsWith("file://") &&
+        !localUri.startsWith("content://") &&
+        !localUri.startsWith("http")
+      ) {
+        localUri = `file://${localUri}`;
+      }
+
+      const { uri } = await VideoThumbnails.getThumbnailAsync(localUri, {
+        time: 0,
+        quality: 0.5,
       });
       return uri;
     } catch (e) {
@@ -297,10 +308,23 @@ export default function ParentPanel() {
               <Text style={styles.contentGroupTitle}>{cat}</Text>
               {catContents.map((item) => (
                 <View key={item.id} style={styles.contentItem}>
-                  <Image
-                    source={{ uri: item.cover || item.uri }}
-                    style={styles.itemThumb}
-                  />
+                  <View style={styles.thumbWrapper}>
+                    {item.cover ? (
+                      <Image
+                        source={{ uri: item.cover }}
+                        style={styles.itemThumb}
+                      />
+                    ) : item.type === "image" ? (
+                      <Image
+                        source={{ uri: item.uri }}
+                        style={styles.itemThumb}
+                      />
+                    ) : (
+                      <View style={[styles.itemThumb, styles.videoFallback]}>
+                        <Video color="#666" size={20} />
+                      </View>
+                    )}
+                  </View>
                   <View style={styles.itemInfo}>
                     <Text style={styles.itemTitle}>{item.title}</Text>
                     <Text style={styles.itemSub}>{item.type}</Text>
@@ -461,13 +485,23 @@ const styles = StyleSheet.create({
   },
   itemThumb: {
     width: 60,
-    height: 40,
-    borderRadius: 4,
+    height: 60,
+    borderRadius: 8,
     backgroundColor: "#eee",
+  },
+  thumbWrapper: {
+    width: 60,
+    height: 60,
+    marginRight: 12,
+  },
+  videoFallback: {
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ddd",
   },
   itemInfo: {
     flex: 1,
-    marginLeft: 15,
   },
   itemTitle: {
     fontSize: 14,

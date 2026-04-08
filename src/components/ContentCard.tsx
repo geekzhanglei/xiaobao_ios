@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, Pressable } from 'react-native';
-import { ContentItem } from '../types';
-import { Play, Image as ImageIcon } from 'lucide-react-native';
+import React from "react";
+import { View, Text, StyleSheet, Image, Pressable } from "react-native";
+import { ContentItem } from "../types";
+import { Play, Image as ImageIcon } from "lucide-react-native";
 
 interface ContentCardProps {
   item: ContentItem;
@@ -12,8 +12,16 @@ export const ContentCard = ({ item, onPress }: ContentCardProps) => {
   return (
     <Pressable style={styles.container} onPress={onPress}>
       <View style={styles.card}>
-        <Image source={{ uri: item.cover || item.uri }} style={styles.image} />
-        {item.type === 'video' ? (
+        {item.cover ? (
+          <Image source={{ uri: item.cover }} style={styles.image} />
+        ) : item.type === "image" ? (
+          <Image source={{ uri: item.uri }} style={styles.image} />
+        ) : (
+          <View style={[styles.image, styles.fallback]}>
+            <Play color="#666" size={40} />
+          </View>
+        )}
+        {item.type === "video" ? (
           <View style={styles.overlay}>
             <Play color="#fff" fill="#fff" size={24} />
           </View>
@@ -24,7 +32,9 @@ export const ContentCard = ({ item, onPress }: ContentCardProps) => {
           </View>
         )}
       </View>
-      <Text style={styles.title} numberOfLines={1}>{item.title || '无标题'}</Text>
+      <Text style={styles.title} numberOfLines={1}>
+        {item.title || "无标题"}
+      </Text>
     </Pressable>
   );
 };
@@ -38,41 +48,46 @@ const styles = StyleSheet.create({
     width: 160,
     height: 100,
     borderRadius: 12,
-    backgroundColor: '#333',
-    overflow: 'hidden',
-    position: 'relative',
+    backgroundColor: "#333",
+    overflow: "hidden",
+    position: "relative",
   },
   image: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  fallback: {
+    backgroundColor: "#eee",
+    justifyContent: "center",
+    alignItems: "center",
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   imageBadge: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 8,
     right: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   imageBadgeText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 10,
     marginLeft: 4,
   },
   title: {
     marginTop: 8,
     fontSize: 14,
-    color: '#fff',
-    fontWeight: '500',
+    color: "#fff",
+    fontWeight: "500",
   },
 });
