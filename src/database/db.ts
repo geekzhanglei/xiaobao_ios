@@ -29,6 +29,17 @@ export const initDatabase = async () => {
     );
   `);
 
+  // Migration: Add theme_color if it doesn't exist (for existing users)
+  try {
+    const tableInfo = await db.getAllAsync<any>("PRAGMA table_info(learning_state)");
+    const hasThemeColor = tableInfo.some(col => col.name === 'theme_color');
+    if (!hasThemeColor) {
+      await db.execAsync("ALTER TABLE learning_state ADD COLUMN theme_color TEXT DEFAULT '#121212'");
+    }
+  } catch (e) {
+    console.error('Database migration failed', e);
+  }
+
   // Initialize learning state if it doesn't exist
   const existingState = await db.getFirstAsync(
     "SELECT * FROM learning_state WHERE id = 1",

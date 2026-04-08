@@ -13,7 +13,8 @@ import {
 import { Stack, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
-import { useStore } from "../../src/store/useStore";
+import * as VideoThumbnails from "expo-video-thumbnails";
+import { useStore } from "../src/store/useStore";
 import {
   Plus,
   Trash2,
@@ -22,6 +23,7 @@ import {
   RotateCcw,
   MinusCircle,
   PlusCircle,
+  FileVideo,
 } from "lucide-react-native";
 
 export default function ParentPanel() {
@@ -74,7 +76,43 @@ export default function ParentPanel() {
     }
   };
 
-  const pickVideo = async () => {
+  const generateThumbnail = async (videoUri: string) => {
+    try {
+      const { uri } = await VideoThumbnails.getThumbnailAsync(videoUri, {
+        time: 1000,
+      });
+      return uri;
+    } catch (e) {
+      console.warn("Thumbnail generation failed", e);
+      return null;
+    }
+  };
+
+  const pickVideoFromLibrary = async () => {
+    if (!selectedCategory) {
+      Alert.alert("错误", "请先选择一个分类");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["videos"],
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      const thumbnail = await generateThumbnail(asset.uri);
+      await addContent({
+        id: Date.now().toString(),
+        type: "video",
+        uri: asset.uri,
+        cover: thumbnail || undefined,
+        category: selectedCategory,
+        title: "相册视频",
+      });
+    }
+  };
+
+  const pickVideoFromFile = async () => {
     if (!selectedCategory) {
       Alert.alert("错误", "请先选择一个分类");
       return;
@@ -85,10 +123,12 @@ export default function ParentPanel() {
 
     if (!result.canceled) {
       const asset = result.assets[0];
+      const thumbnail = await generateThumbnail(asset.uri);
       await addContent({
         id: Date.now().toString(),
         type: "video",
         uri: asset.uri,
+        cover: thumbnail || undefined,
         category: selectedCategory,
         title: asset.name,
       });
@@ -231,13 +271,17 @@ export default function ParentPanel() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>内容上传</Text>
         <View style={styles.uploadRow}>
-          <Pressable style={styles.uploadButton} onPress={pickVideo}>
-            <Video color="#fff" size={30} />
-            <Text style={styles.uploadButtonText}>上传视频</Text>
-          </Pressable>
           <Pressable style={styles.uploadButton} onPress={pickImage}>
-            <ImageIcon color="#fff" size={30} />
-            <Text style={styles.uploadButtonText}>上传图片</Text>
+            <ImageIcon color="#fff" size={28} />
+            <Text style={styles.uploadButtonText}>相册图片</Text>
+          </Pressable>
+          <Pressable style={styles.uploadButton} onPress={pickVideoFromLibrary}>
+            <Video color="#fff" size={28} />
+            <Text style={styles.uploadButtonText}>相册视频</Text>
+          </Pressable>
+          <Pressable style={styles.uploadButton} onPress={pickVideoFromFile}>
+            <FileVideo color="#fff" size={28} />
+            <Text style={styles.uploadButtonText}>文件视频</Text>
           </Pressable>
         </View>
       </View>
@@ -385,10 +429,10 @@ const styles = StyleSheet.create({
   },
   uploadButton: {
     backgroundColor: "#333",
-    padding: 20,
+    padding: 15,
     borderRadius: 12,
     alignItems: "center",
-    width: "45%",
+    width: "30%",
   },
   uploadButtonText: {
     color: "#fff",

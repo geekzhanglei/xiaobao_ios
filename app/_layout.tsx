@@ -12,7 +12,7 @@ import { useStore } from "../src/store/useStore";
 import { LockOverlay } from "../src/components/LockOverlay";
 
 export const unstable_settings = {
-  anchor: "(tabs)",
+  anchor: "返回",
 };
 
 export default function RootLayout() {
@@ -33,7 +33,11 @@ export default function RootLayout() {
         />
         <Stack.Screen
           name="parent"
-          options={{ title: "家长面板", headerShown: true }}
+          options={{
+            title: "家长管理",
+            headerShown: true,
+            headerBackTitle: "返回",
+          }}
         />
       </Stack>
       <StatusBar style="auto" />

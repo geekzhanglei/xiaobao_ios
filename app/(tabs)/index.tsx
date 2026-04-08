@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -12,9 +12,11 @@ import { useRouter } from "expo-router";
 import { useStore } from "../../src/store/useStore";
 import { ContentCard } from "../../src/components/ContentCard";
 import { ParentGate } from "../../src/components/ParentGate";
+import { Palette } from "lucide-react-native";
 
 export default function HomeScreen() {
   const { contents, categories, learningState, updateThemeColor } = useStore();
+  const [showColorPicker, setShowColorPicker] = useState(false);
   const router = useRouter();
 
   const themeColors = [
@@ -57,52 +59,64 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: learningState.themeColor }]}
-    >
-      <View style={styles.header}>
-        <ParentGate>
-          <Text style={styles.headerTitle}>我的书架</Text>
-        </ParentGate>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.themeSelector}
-        >
-          {themeColors.map((color) => (
+    <View style={{ flex: 1, backgroundColor: learningState.themeColor }}>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <ParentGate>
+            <Text style={styles.headerTitle}>我的书架</Text>
+          </ParentGate>
+          <View style={styles.themeContainer}>
             <Pressable
-              key={color}
-              style={[
-                styles.colorDot,
-                { backgroundColor: color },
-                learningState.themeColor === color && styles.colorDotActive,
-              ]}
-              onPress={() => updateThemeColor(color)}
-            />
-          ))}
-        </ScrollView>
-      </View>
+              style={styles.paletteButton}
+              onPress={() => setShowColorPicker(!showColorPicker)}
+            >
+              <Palette color="#fff" size={24} />
+            </Pressable>
 
-      {contents.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>还没有内容哦，请家长帮忙添加吧！</Text>
+            {showColorPicker && (
+              <View style={styles.colorPickerPanel}>
+                {themeColors.map((color) => (
+                  <Pressable
+                    key={color}
+                    style={[
+                      styles.colorDot,
+                      { backgroundColor: color },
+                      learningState.themeColor === color &&
+                        styles.colorDotActive,
+                    ]}
+                    onPress={() => {
+                      updateThemeColor(color);
+                      setShowColorPicker(false);
+                    }}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
         </View>
-      ) : (
-        <FlatList
-          data={categories}
-          keyExtractor={(item) => item}
-          renderItem={renderCategory}
-          contentContainerStyle={styles.verticalList}
-        />
-      )}
-    </SafeAreaView>
+
+        {contents.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              还没有内容哦，请家长帮忙添加吧！
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={categories}
+            keyExtractor={(item) => item}
+            renderItem={renderCategory}
+            contentContainerStyle={styles.verticalList}
+          />
+        )}
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212",
   },
   header: {
     padding: 20,
@@ -116,9 +130,25 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#fff",
   },
-  themeSelector: {
-    marginLeft: 20,
-    flexGrow: 0,
+  themeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    position: "relative",
+  },
+  paletteButton: {
+    padding: 8,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderRadius: 20,
+  },
+  colorPickerPanel: {
+    position: "absolute",
+    right: 45,
+    flexDirection: "row",
+    backgroundColor: "rgba(0,0,0,0.8)",
+    padding: 8,
+    borderRadius: 25,
+    alignItems: "center",
+    zIndex: 2000,
   },
   colorDot: {
     width: 24,
