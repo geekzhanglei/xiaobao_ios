@@ -8,6 +8,7 @@
         "android": "mkdir -p .expo_cache && EXPO_CACHE_DIR=./.expo_cache expo start --android",
         "ios": "mkdir -p .expo_cache && EXPO_CACHE_DIR=./.expo_cache expo start --ios",
         "web": "mkdir -p .expo_cache && EXPO_CACHE_DIR=./.expo_cache expo start --web",
+        "ios:build-dev": "npx expo prebuild --clean && cd ios && pod install && cd .. && npx expo run:ios",
         "lint": "expo lint"
     },
     "dependencies": {
