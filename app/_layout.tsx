@@ -7,6 +7,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "react-native-reanimated";
 import React, { useEffect } from "react";
+import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from "expo-av";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { useStore } from "../src/store/useStore";
 import { LockOverlay } from "../src/components/LockOverlay";
@@ -21,6 +22,15 @@ export default function RootLayout() {
 
   useEffect(() => {
     init();
+    // Configure audio to play even when silent mode is on
+    Audio.setAudioModeAsync({
+      playsInSilentModeIOS: true,
+      allowsRecordingIOS: false,
+      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+      shouldDuckAndroid: true,
+      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+      playThroughEarpieceAndroid: false,
+    });
   }, [init]);
 
   return (
