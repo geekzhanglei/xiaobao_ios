@@ -1,0 +1,64 @@
+name: iOS Build
+
+on:
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout Repo
+      uses: actions/checkout@v3
+
+    - name: Set up Node
+      uses: actions/setup-node@v3
+      with:
+        node-version: 20
+
+    - name: Install Yarn
+      run: npm install -g yarn
+
+    - name: Install Dependencies
+      run: yarn install
+
+    - name: Decode and Install Certificates
+      run: |
+        echo "${{ secrets.CERT_P12 }}" | base64 --decode > ios_certificate.p12
+        echo "${{ secrets.PROVISIONING_PROFILE }}" | base64 --decode > YourApp.mobileprovision
+        mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+        cp YourApp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+        security create-keychain -p "" build.keychain
+        security import ios_certificate.p12 -k ~/Library/Keychains/build.keychain -P "${{ secrets.CERT_P12_PASSWORD }}" -T /usr/bin/codesign
+        security list-keychains -s ~/Library/Keychains/build.keychain
+
+    - name: Install CocoaPods
+      run: |
+        sudo gem install cocoapods
+        cd ios
+        pod install
+
+    - name: Build iOS App
+      run: |
+        cd ios
+        xcodebuild -workspace YourApp.xcworkspace \
+          -scheme YourApp \
+          -configuration Release \
+          -sdk iphoneos \
+          -allowProvisioningUpdates \
+          clean archive \
+          -archivePath $PWD/build/YourApp.xcarchive
+
+    - name: Export IPA
+      run: |
+        cd ios
+        xcodebuild -exportArchive \
+          -archivePath build/YourApp.xcarchive \
+          -exportOptionsPlist exportOptions.plist \
+          -exportPath build
+
+    - name: Upload IPA
+      uses: actions/upload-artifact@v3
+      with:
+        name: YourApp.ipa
+        path: ios/build/*.ipa
