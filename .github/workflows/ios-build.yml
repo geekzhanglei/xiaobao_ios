@@ -1,7 +1,9 @@
 name: iOS Build
 
 on:
-  workflow_dispatch:  # 支持手动触发
+  push:
+    branches:
+      - main
 
 jobs:
   build:
@@ -10,6 +12,14 @@ jobs:
     steps:
     - name: Checkout Repo
       uses: actions/checkout@v3
+
+    - name: Print Basic Info
+      run: |
+        echo "Node: $(node -v || true)"
+        echo "Yarn: $(yarn -v || true)"
+        echo "Ruby: $(ruby -v || true)"
+        echo "Xcode:"
+        xcodebuild -version
 
     - name: Set up Node
       uses: actions/setup-node@v3
@@ -22,44 +32,135 @@ jobs:
     - name: Install Dependencies
       run: yarn install
 
-    - name: Decode and Install Certificates
+    # ✅ 证书
+    - name: Setup Certificates
       run: |
-        echo "${{ secrets.CERT_P12 }}" | base64 --decode > ios_certificate.p12
-        echo "${{ secrets.PROVISIONING_PROFILE }}" | base64 --decode > YourApp.mobileprovision
-        mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-        cp YourApp.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
-        security create-keychain -p "" build.keychain
-        security import ios_certificate.p12 -k ~/Library/Keychains/build.keychain -P "${{ secrets.CERT_P12_PASSWORD }}" -T /usr/bin/codesign
-        security list-keychains -s ~/Library/Keychains/build.keychain
+        echo "== Setup Certificates =="
 
+        echo "${{ secrets.CERT_P12 }}" | base64 --decode > cert.p12
+        echo "${{ secrets.PROVISIONING_PROFILE }}" | base64 --decode > profile.mobileprovision
+
+        mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+        cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
+        security create-keychain -p "" build.keychain
+        security default-keychain -s build.keychain
+        security unlock-keychain -p "" build.keychain
+
+        security import cert.p12 \
+          -k build.keychain \
+          -P "${{ secrets.CERT_P12_PASSWORD }}" \
+          -T /usr/bin/codesign
+
+        security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+
+        echo "== Certificates Installed =="
+
+    # ✅ Pods
     - name: Install CocoaPods
       run: |
-        sudo gem install cocoapods
-        cd ios
-        pod install
+        echo "== Install Pods =="
 
+        sudo gem install cocoapods
+
+        cd ios
+
+        pwd
+        ls -al
+
+        export RCT_NEW_ARCH_ENABLED=1
+        pod install --repo-update
+
+        echo "== After pod install =="
+        ls -al
+        ls -al *.xcworkspace || true
+
+    # ✅ Build
     - name: Build iOS App
       run: |
+        set -e
+        set -o pipefail
+
         cd ios
-        xcodebuild -workspace YourApp.xcworkspace \
-          -scheme YourApp \
+
+        echo "== Detect Workspace / Project =="
+
+        pwd
+        ls -al
+
+        WORKSPACE=$(find . -maxdepth 1 -name "*.xcworkspace" -type d | head -n 1)
+        PROJECT=$(find . -maxdepth 1 -name "*.xcodeproj" -type d | head -n 1)
+
+        if [ -n "$WORKSPACE" ]; then
+          echo "✅ Using workspace: $WORKSPACE"
+          BUILD_CMD="-workspace $WORKSPACE"
+        elif [ -n "$PROJECT" ]; then
+          echo "⚠️ Using project: $PROJECT"
+          BUILD_CMD="-project $PROJECT"
+        else
+          echo "❌ No workspace or project found!"
+          exit 1
+        fi
+
+        echo "== List Schemes =="
+        xcodebuild $BUILD_CMD -list
+
+        # ✅ 自动获取 scheme（避免写死错误）
+        SCHEME=$(xcodebuild $BUILD_CMD -list \
+          | awk '/Schemes:/,/^$/' \
+          | tail -n +2 \
+          | head -n 1 \
+          | xargs)
+
+        if [ -z "$SCHEME" ]; then
+          echo "❌ No scheme found!"
+          exit 1
+        fi
+
+        echo "✅ Using scheme: $SCHEME"
+
+        echo "== Start Build =="
+
+        xcodebuild \
+          $BUILD_CMD \
+          -scheme "$SCHEME" \
           -configuration Release \
           -sdk iphoneos \
           -allowProvisioningUpdates \
-          clean archive \
-          -archivePath $PWD/build/YourApp.xcarchive
+          archive \
+          -archivePath $PWD/build/$SCHEME.xcarchive \
+          | tee build.log
 
+        echo "== Build Done =="
+
+        # 保存 scheme 给后续步骤用
+        echo "SCHEME=$SCHEME" >> $GITHUB_ENV
+
+    # ✅ Export IPA
     - name: Export IPA
       run: |
-        cd ios
-        xcodebuild -exportArchive \
-          -archivePath build/YourApp.xcarchive \
-          -exportOptionsPlist exportOptions.plist \
-          -exportPath build
+        set -e
 
+        cd ios
+
+        echo "Using scheme: $SCHEME"
+
+        ls -al build || true
+
+        xcodebuild -exportArchive \
+          -archivePath build/$SCHEME.xcarchive \
+          -exportOptionsPlist ../ExportOptions.plist \
+          -exportPath build \
+          | tee export.log
+
+        echo "== Export Done =="
+
+        ls -al build
+
+    # ✅ 上传
     - name: Upload IPA
       uses: actions/upload-artifact@v4
       with:
-        name: YourApp.ipa
+        name: app.ipa
         path: ios/build/*.ipa
         retention-days: 30
