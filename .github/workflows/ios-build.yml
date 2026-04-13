@@ -16,7 +16,7 @@ jobs:
     - name: Print Basic Info
       run: |
         echo "Node: $(node -v || true)"
-        echo "Yarn: $(yarn -v || true)"
+        echo "pnpm: $(pnpm -v || true)"
         echo "Ruby: $(ruby -v || true)"
         echo "Xcode:"
         xcodebuild -version
@@ -26,11 +26,11 @@ jobs:
       with:
         node-version: 20
 
-    - name: Install Yarn
-      run: npm install -g yarn
+    - name: Install pnpm
+      run: npm install -g pnpm
 
     - name: Install Dependencies
-      run: yarn install
+      run: pnpm install
 
     # ✅ 证书
     - name: Setup Certificates
@@ -56,24 +56,12 @@ jobs:
 
         echo "== Certificates Installed =="
 
-    # ✅ Pods
-    - name: Install CocoaPods
+    # ✅ Setup iOS with Expo
+    - name: Setup iOS
       run: |
-        echo "== Install Pods =="
-
-        sudo gem install cocoapods
-
-        cd ios
-
-        pwd
-        ls -al
-
-        export RCT_NEW_ARCH_ENABLED=1
-        pod install --repo-update
-
-        echo "== After pod install =="
-        ls -al
-        ls -al *.xcworkspace || true
+        echo "== Setup iOS with Expo =="
+        pnpm ios:setup
+        echo "== iOS Setup Complete =="
 
     # ✅ Build
     - name: Build iOS App
