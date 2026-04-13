@@ -1,0 +1,32 @@
+{
+  "source": "/Users/zhanglei/code/mine/xiaobao_ios/XiaobaoNative/XiaobaoNative/Components/LockOverlay.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "今日学习已结束",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 23
+        }
+      },
+      {
+        "comment": "",
+        "key": "不能再看了",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 27
+        }
+      },
+      {
+        "comment": "",
+        "key": "点击锁图标5次进入家长管理",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 31
+        }
+      }
+    ]
+  },
+  "version": 1
+}

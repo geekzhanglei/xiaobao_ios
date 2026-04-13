@@ -1,0 +1,40 @@
+{
+  "source": "/Users/zhanglei/code/mine/xiaobao_ios/XiaobaoNative/XiaobaoNative/Components/ParentGate.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "家长验证",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 15
+        }
+      },
+      {
+        "comment": "",
+        "key": "请在1秒内连续点击4次",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 19
+        }
+      },
+      {
+        "comment": "",
+        "key": "点击",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 22
+        }
+      },
+      {
+        "comment": "",
+        "key": "取消",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 28
+        }
+      }
+    ]
+  },
+  "version": 1
+}

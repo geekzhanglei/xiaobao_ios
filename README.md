@@ -2,7 +2,32 @@
 
 这是一个基于 Expo 构建的儿童学习管理应用，支持家长添加视频/图片内容，并提供学习时长控制功能。
 
-## 🚀 快速开始
+## � 项目版本
+
+项目提供两个版本：
+
+1. **React Native 版本** (当前目录) - 基于 Expo + React Native，跨平台支持
+2. **Swift 原生版本** (`XiaobaoNative/` 目录) - 纯 Swift + SwiftUI，构建速度更快
+
+### Swift 原生版本
+
+为了加快构建和打包速度，项目已迁移至 Swift 原生实现。详细信息请查看 [XiaobaoNative/README.md](./XiaobaoNative/README.md)
+
+**优势**：
+- 构建速度提升 3-5 倍
+- 打包速度更快
+- 启动速度更快
+- 包体积更小
+- 性能更优
+
+**快速开始**：
+```bash
+cd XiaobaoNative
+open XiaobaoNative.xcodeproj
+# 在 Xcode 中添加 SQLite.swift 依赖后运行
+```
+
+## �🚀 快速开始
 
 1. **安装依赖**
    ```bash
@@ -11,13 +36,22 @@
 
 2. **启动项目**
    ```bash
-   pnpm dev     # 启动项目
+   pnpm de (React Native 版本)v     # 启动项目
    pnpm run ios     # 启动 iOS 模拟器p
    pnpm run android # 启动 Android 模拟器
    ```
 
 ## 🔐 家长端入口 (重要)
 
+
+## 🛠️ 技术栈 (Swift 原生版本)
+
+- **UI 框架**: SwiftUI
+- **数据库**: SQLite.swift
+- **状态管理**: @Observable (iOS 17+)
+- **视频播放**: AVKit / AVFoundation
+- **图片选择**: PHPickerViewController
+- **文件选择**: UIDocumentPickerViewController
 为了防止儿童误操作进入管理页面，应用设计了一个**隐藏入口**：
 
 - **操作方式**: 在首页点击 **“我的书架”** 文字 **1 秒内连续点击 4 次**。

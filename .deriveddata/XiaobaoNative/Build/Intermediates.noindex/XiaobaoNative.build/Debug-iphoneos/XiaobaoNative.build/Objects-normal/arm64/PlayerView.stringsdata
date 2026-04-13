@@ -1,0 +1,16 @@
+{
+  "source": "/Users/zhanglei/code/mine/xiaobao_ios/XiaobaoNative/XiaobaoNative/Views/PlayerView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "加载中...",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 29
+        }
+      }
+    ]
+  },
+  "version": 1
+}
