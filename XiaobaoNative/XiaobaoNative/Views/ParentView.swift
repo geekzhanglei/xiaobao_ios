@@ -152,13 +152,15 @@ struct ParentView: View {
                                 Label("重命名", systemImage: "pencil")
                             }
                             
-                            Button(role: .destructive) {
-                                store.deleteCategory(name: category)
-                                if selectedCategory == category {
-                                    selectedCategory = ""
+                            if (contentByCategory[category]?.isEmpty ?? true) {
+                                Button(role: .destructive) {
+                                    store.deleteCategory(name: category)
+                                    if selectedCategory == category {
+                                        selectedCategory = ""
+                                    }
+                                } label: {
+                                    Label("删除", systemImage: "trash")
                                 }
-                            } label: {
-                                Label("删除", systemImage: "trash")
                             }
                         }
                     }
@@ -311,16 +313,6 @@ struct ParentView: View {
                 Button("取消", role: .cancel) {
                     selectedCategoryForRename = nil
                     renameTo = ""
-                }
-                Button("删除", role: .destructive) {
-                    if let oldName = selectedCategoryForRename {
-                        store.deleteCategory(name: oldName)
-                        if selectedCategory == oldName {
-                            selectedCategory = ""
-                        }
-                        selectedCategoryForRename = nil
-                        renameTo = ""
-                    }
                 }
                 Button("重命名") {
                     if let oldName = selectedCategoryForRename {

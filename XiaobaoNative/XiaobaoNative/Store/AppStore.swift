@@ -89,8 +89,11 @@ class AppStore: ObservableObject {
 
         let renamedCategory = db.renameCategory(oldName: normalizedOldName, newName: normalizedNewName) ?? normalizedNewName
         renameCachedCategory(oldName: normalizedOldName, newName: renamedCategory)
-        loadCategories()
+        
+        // Critical: reload content first so the categories derived from content reflect the change
         loadContent()
+        loadCategories()
+        
         return renamedCategory
     }
 

@@ -19,7 +19,7 @@ struct HomeView: View {
 
                 if store.learningState.locked {
                     LockOverlay(onUnlock: {
-                        showParentGate = true
+                        showParentView = true
                     })
                 } else {
                     ScrollView {

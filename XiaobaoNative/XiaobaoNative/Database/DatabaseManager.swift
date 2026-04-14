@@ -187,11 +187,10 @@ class DatabaseManager {
         let normalizedNewName = normalizedCategoryName(newName)
 
         guard !normalizedOldName.isEmpty, !normalizedNewName.isEmpty else {
-            print("DatabaseManager: 重命名分类失败，名称为空")
             return nil
         }
 
-        if normalizedOldName.localizedCaseInsensitiveCompare(normalizedNewName) == .orderedSame {
+        if normalizedOldName == normalizedNewName {
             return normalizedNewName
         }
 
@@ -200,53 +199,51 @@ class DatabaseManager {
 
         do {
             let categoryEntities = try context.fetch(categoryRequest)
-            let matchedCategoryEntities = categoryEntities.filter {
+            
+            // Find all matching old category entities to delete or update
+            let oldCategoryEntities = categoryEntities.filter {
                 normalizedCategoryName($0.value(forKey: "name") as? String ?? "") == normalizedOldName
             }
-
-            guard !matchedCategoryEntities.isEmpty else {
-                print("DatabaseManager: 未找到要重命名的分类 \(normalizedOldName)")
-                return nil
+            
+            // Check if destination category already exists
+            let targetCategoryEntity = categoryEntities.first {
+                normalizedCategoryName($0.value(forKey: "name") as? String ?? "") == normalizedNewName
             }
 
-            // Check if new name already exists (excluding the old name)
-            let hasTargetCategory = categoryEntities.contains {
-                let currentName = normalizedCategoryName($0.value(forKey: "name") as? String ?? "")
-                return currentName == normalizedNewName && currentName != normalizedOldName
-            }
-
-            if hasTargetCategory {
-                // If target category exists, merge content into it and delete old category
-                let contentEntities = try context.fetch(contentRequest)
-                for entity in contentEntities {
-                    let currentCategory = normalizedCategoryName(entity.value(forKey: "category") as? String ?? "")
-                    if currentCategory == normalizedOldName {
-                        entity.setValue(normalizedNewName, forKey: "category")
-                    }
+            // Update all content items first
+            let contentEntities = try context.fetch(contentRequest)
+            for entity in contentEntities {
+                let currentCategory = normalizedCategoryName(entity.value(forKey: "category") as? String ?? "")
+                if currentCategory == normalizedOldName {
+                    entity.setValue(normalizedNewName, forKey: "category")
                 }
-                for entity in matchedCategoryEntities {
+            }
+
+            if targetCategoryEntity != nil {
+                // Destination exists: merge by deleting all old category entities
+                for entity in oldCategoryEntities {
                     context.delete(entity)
                 }
             } else {
-                // Otherwise, rename the existing category
-                for entity in matchedCategoryEntities {
-                    entity.setValue(normalizedNewName, forKey: "name")
-                }
-
-                // Update all content items with the old category to use the new category name
-                let contentEntities = try context.fetch(contentRequest)
-                for entity in contentEntities {
-                    let currentCategory = normalizedCategoryName(entity.value(forKey: "category") as? String ?? "")
-                    if currentCategory == normalizedOldName {
-                        entity.setValue(normalizedNewName, forKey: "category")
+                // Destination doesn't exist: rename the first one and delete any duplicates
+                if let mainEntity = oldCategoryEntities.first {
+                    mainEntity.setValue(normalizedNewName, forKey: "name")
+                    // Delete any accidental duplicates of the old name
+                    for i in 1..<oldCategoryEntities.count {
+                        context.delete(oldCategoryEntities[i])
                     }
+                } else {
+                    // Somehow the CategoryEntity is missing but we're renaming it? 
+                    // Create the new one just in case.
+                    let newEntity = NSEntityDescription.insertNewObject(forEntityName: "CategoryEntity", into: context)
+                    newEntity.setValue(normalizedNewName, forKey: "name")
                 }
             }
 
             save()
             return normalizedNewName
         } catch {
-            print("Error renaming category: \(error)")
+            print("Error refining rename category: \(error)")
             return nil
         }
     }
