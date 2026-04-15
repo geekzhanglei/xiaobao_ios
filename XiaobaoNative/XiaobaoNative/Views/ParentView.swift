@@ -260,96 +260,97 @@ struct ParentView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showImagePicker) {
-                ImagePicker { urls in
-                    for url in urls {
-                        let category = selectedCategory.isEmpty ? (store.categories.first ?? "默认") : selectedCategory
-                        let item = ContentItem(
-                            type: .image,
-                            title: "图片",
-                            uri: url.absoluteString,
-                            category: category
-                        )
-                        store.addContent(item)
-                    }
+        }
+        .navigationViewStyle(StackNavigationViewStyle())
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker { urls in
+                for url in urls {
+                    let category = selectedCategory.isEmpty ? (store.categories.first ?? "默认") : selectedCategory
+                    let item = ContentItem(
+                        type: .image,
+                        title: "图片",
+                        uri: url.absoluteString,
+                        category: category
+                    )
+                    store.addContent(item)
                 }
             }
-            .sheet(isPresented: $showVideoPicker) {
-                VideoPicker { urls in
-                    for url in urls {
-                        let category = selectedCategory.isEmpty ? (store.categories.first ?? "默认") : selectedCategory
-                        // Generate thumbnail for video
-                        let thumbnailURL = VideoThumbnailGenerator.generateThumbnail(from: url)
-                        let item = ContentItem(
-                            type: .video,
-                            title: "视频",
-                            cover: thumbnailURL?.absoluteString,
-                            uri: url.absoluteString,
-                            category: category
-                        )
-                        store.addContent(item)
-                    }
+        }
+        .sheet(isPresented: $showVideoPicker) {
+            VideoPicker { urls in
+                for url in urls {
+                    let category = selectedCategory.isEmpty ? (store.categories.first ?? "默认") : selectedCategory
+                    // Generate thumbnail for video
+                    let thumbnailURL = VideoThumbnailGenerator.generateThumbnail(from: url)
+                    let item = ContentItem(
+                        type: .video,
+                        title: "视频",
+                        cover: thumbnailURL?.absoluteString,
+                        uri: url.absoluteString,
+                        category: category
+                    )
+                    store.addContent(item)
                 }
             }
-            .sheet(isPresented: $showDocumentPicker) {
-                DocumentPicker { urls in
-                    for url in urls {
-                        let category = selectedCategory.isEmpty ? (store.categories.first ?? "默认") : selectedCategory
-                        // Generate thumbnail for video
-                        let thumbnailURL = VideoThumbnailGenerator.generateThumbnail(from: url)
-                        let item = ContentItem(
-                            type: .video,
-                            title: url.lastPathComponent,
-                            cover: thumbnailURL?.absoluteString,
-                            uri: url.absoluteString,
-                            category: category
-                        )
-                        store.addContent(item)
-                    }
+        }
+        .sheet(isPresented: $showDocumentPicker) {
+            DocumentPicker { urls in
+                for url in urls {
+                    let category = selectedCategory.isEmpty ? (store.categories.first ?? "默认") : selectedCategory
+                    // Generate thumbnail for video
+                    let thumbnailURL = VideoThumbnailGenerator.generateThumbnail(from: url)
+                    let item = ContentItem(
+                        type: .video,
+                        title: url.lastPathComponent,
+                        cover: thumbnailURL?.absoluteString,
+                        uri: url.absoluteString,
+                        category: category
+                    )
+                    store.addContent(item)
                 }
             }
-            .alert("编辑分类", isPresented: $showEditAlert) {
-                TextField("新名称", text: $renameTo)
-                Button("取消", role: .cancel) {
+        }
+        .alert("编辑分类", isPresented: $showEditAlert) {
+            TextField("新名称", text: $renameTo)
+            Button("取消", role: .cancel) {
+                selectedCategoryForRename = nil
+                renameTo = ""
+            }
+            Button("重命名") {
+                if let oldName = selectedCategoryForRename {
+                    let trimmedNewName = renameTo.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmedNewName.isEmpty else {
+                        alertMessage = "分类名称不能为空"
+                        showAlert = true
+                        selectedCategoryForRename = nil
+                        renameTo = ""
+                        return
+                    }
+                    let renamedCategory = store.renameCategory(oldName: oldName, newName: trimmedNewName)
+                    if selectedCategory == oldName {
+                        selectedCategory = renamedCategory ?? ""
+                    }
                     selectedCategoryForRename = nil
                     renameTo = ""
                 }
-                Button("重命名") {
-                    if let oldName = selectedCategoryForRename {
-                        let trimmedNewName = renameTo.trimmingCharacters(in: .whitespacesAndNewlines)
-                        guard !trimmedNewName.isEmpty else {
-                            alertMessage = "分类名称不能为空"
-                            showAlert = true
-                            selectedCategoryForRename = nil
-                            renameTo = ""
-                            return
-                        }
-                        let renamedCategory = store.renameCategory(oldName: oldName, newName: trimmedNewName)
-                        if selectedCategory == oldName {
-                            selectedCategory = renamedCategory ?? ""
-                        }
-                        selectedCategoryForRename = nil
-                        renameTo = ""
-                    }
-                }
-            } message: {
-                if let categoryName = selectedCategoryForRename {
-                    Text("编辑分类: \(categoryName)")
-                } else {
-                    Text("编辑分类")
-                }
             }
-            .alert("提示", isPresented: $showAlert) {
-                Button("确定") {}
-            } message: {
-                Text(alertMessage)
+        } message: {
+            if let categoryName = selectedCategoryForRename {
+                Text("编辑分类: \(categoryName)")
+            } else {
+                Text("编辑分类")
             }
-            .onAppear {
-                syncSelectedCategory(with: store.categories)
-            }
-            .onChange(of: store.categories) { categories in
-                syncSelectedCategory(with: categories)
-            }
+        }
+        .alert("提示", isPresented: $showAlert) {
+            Button("确定") {}
+        } message: {
+            Text(alertMessage)
+        }
+        .onAppear {
+            syncSelectedCategory(with: store.categories)
+        }
+        .onChange(of: store.categories) { categories in
+            syncSelectedCategory(with: categories)
         }
     }
 }

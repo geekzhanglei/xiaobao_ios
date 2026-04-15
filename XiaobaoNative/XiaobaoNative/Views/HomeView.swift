@@ -12,102 +12,100 @@ struct HomeView: View {
     @State private var selectedPlayerIndex: Int = 0
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color(hex: currentThemeColor)
-                    .ignoresSafeArea()
+        ZStack {
+            Color(hex: currentThemeColor)
+                .ignoresSafeArea()
 
-                if store.learningState.locked {
-                    LockOverlay(onUnlock: {
-                        showParentView = true
-                    })
-                } else {
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            ForEach(store.categories, id: \.self) { category in
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text(category)
-                                        .font(.headline)
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal)
+            if store.learningState.locked {
+                LockOverlay(onUnlock: {
+                    showParentView = true
+                })
+            } else {
+                ScrollView {
+                    VStack(spacing: 20) {
+                        ForEach(store.categories, id: \.self) { category in
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(category)
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal)
 
-                                    let categoryItems = store.content.filter { $0.category == category }
-                                    ScrollView(.horizontal, showsIndicators: false) {
-                                        HStack(spacing: 15) {
-                                            ForEach(Array(categoryItems.enumerated()), id: \.element.id) { index, item in
-                                                Button(action: {
-                                                    selectedPlayerItems = categoryItems
-                                                    selectedPlayerIndex = index
-                                                }) {
-                                                    ContentCard(item: item)
-                                                        .frame(width: 150)
-                                                }
-                                                .buttonStyle(PlainButtonStyle())
+                                let categoryItems = store.content.filter { $0.category == category }
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 15) {
+                                        ForEach(Array(categoryItems.enumerated()), id: \.element.id) { index, item in
+                                            Button(action: {
+                                                selectedPlayerItems = categoryItems
+                                                selectedPlayerIndex = index
+                                            }) {
+                                                ContentCard(item: item)
+                                                    .frame(width: 150)
                                             }
+                                            .buttonStyle(PlainButtonStyle())
                                         }
-                                        .padding(.horizontal)
                                     }
+                                    .padding(.horizontal)
                                 }
                             }
                         }
-                        .padding()
                     }
+                    .padding()
                 }
+            }
 
-                if showParentGate {
-                    ParentGate(onSuccess: {
-                        showParentGate = false
-                        showParentView = true
-                    }) {
-                        showParentGate = false
-                    }
+            if showParentGate {
+                ParentGate(onSuccess: {
+                    showParentGate = false
+                    showParentView = true
+                }) {
+                    showParentGate = false
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("我的书架")
-                        .foregroundColor(.white)
-                        .onTapGesture {
-                            let now = Date()
-                            if now.timeIntervalSince(lastTapTime) < 0.5 {
-                                tapCount += 1
-                                if tapCount >= 4 {
-                                    tapCount = 0
-                                    showParentView = true
-                                }
-                            } else {
-                                tapCount = 1
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("我的书架")
+                    .foregroundColor(.white)
+                    .onTapGesture {
+                        let now = Date()
+                        if now.timeIntervalSince(lastTapTime) < 0.5 {
+                            tapCount += 1
+                            if tapCount >= 4 {
+                                tapCount = 0
+                                showParentView = true
                             }
-                            lastTapTime = now
+                        } else {
+                            tapCount = 1
                         }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        showColorPicker = true
-                    }) {
-                        Image(systemName: "paintpalette.fill")
-                            .foregroundColor(.white)
+                        lastTapTime = now
                     }
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showColorPicker = true
+                }) {
+                    Image(systemName: "paintpalette.fill")
+                        .foregroundColor(.white)
                 }
             }
-            .fullScreenCover(isPresented: Binding(
-                get: { selectedPlayerItems != nil },
-                set: { if !$0 { selectedPlayerItems = nil } }
-            )) {
-                if let items = selectedPlayerItems {
-                    PlayerView(items: items, initialIndex: selectedPlayerIndex)
-                }
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { selectedPlayerItems != nil },
+            set: { if !$0 { selectedPlayerItems = nil } }
+        )) {
+            if let items = selectedPlayerItems {
+                PlayerView(items: items, initialIndex: selectedPlayerIndex)
             }
-            .sheet(isPresented: $showColorPicker) {
-                ColorPickerView(isPresented: $showColorPicker, currentColor: currentThemeColor) { color in
-                    currentThemeColor = color
-                    store.updateThemeColor(color)
-                }
+        }
+        .sheet(isPresented: $showColorPicker) {
+            ColorPickerView(isPresented: $showColorPicker, currentColor: currentThemeColor) { color in
+                currentThemeColor = color
+                store.updateThemeColor(color)
             }
-            .sheet(isPresented: $showParentView) {
-                ParentView()
-            }
+        }
+        .sheet(isPresented: $showParentView) {
+            ParentView()
         }
     }
 }
@@ -164,5 +162,6 @@ struct ColorPickerView: View {
                 }
             }
         }
+        .navigationViewStyle(.stack)
     }
 }

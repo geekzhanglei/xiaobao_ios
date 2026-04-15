@@ -6,8 +6,11 @@ struct XiaobaoNativeApp: App {
 
     var body: some Scene {
         WindowGroup {
-            HomeView()
-                .environmentObject(store)
+            NavigationView {
+                HomeView()
+            }
+            .navigationViewStyle(StackNavigationViewStyle())
+            .environmentObject(store)
         }
     }
 }

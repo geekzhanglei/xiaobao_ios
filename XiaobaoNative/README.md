@@ -96,6 +96,16 @@ XiaobaoNative/
 <string>需要访问文件来选择视频</string>
 ```
 
+### iPad 全屏配置
+
+为确保应用在 iPad 上全屏显示，项目已配置：
+
+- `LaunchScreen.storyboard` - 启动屏幕
+- `INFOPLIST_KEY_UILaunchStoryboardName = "LaunchScreen"` - 指定启动屏幕
+- `INFOPLIST_KEY_UIRequiresFullScreen = YES` - 强制全屏显示
+
+这些配置在 `project.pbxproj` 的 Debug 和 Release 构建配置中均已设置。
+
 ## 数据迁移
 
 从 React Native 版本迁移数据：
