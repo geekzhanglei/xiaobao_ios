@@ -32,7 +32,7 @@ struct HomeView: View {
 
                                 let categoryItems = store.content.filter { $0.category == category }
                                 ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 15) {
+                                    HStack(spacing: 20) { // Increased spacing for better isolation
                                         ForEach(Array(categoryItems.enumerated()), id: \.element.id) { index, item in
                                             Button(action: {
                                                 selectedPlayerItems = categoryItems
@@ -42,6 +42,7 @@ struct HomeView: View {
                                                     .frame(width: 150)
                                             }
                                             .buttonStyle(PlainButtonStyle())
+                                            .contentShape(Rectangle()) // Ensure tap target is strictly within the card frame
                                         }
                                     }
                                     .padding(.horizontal)

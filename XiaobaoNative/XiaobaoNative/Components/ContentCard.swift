@@ -38,21 +38,24 @@ struct ContentCard: View {
             }
             .frame(height: 120)
             .cornerRadius(12)
+            .clipped() // Ensure content doesn't bleed out
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    .stroke(Color.white.opacity(0.2), lineWidth: 1.5) // More visible inner border
             )
-            .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
         }
         .padding(8)
+        .frame(width: 150) // Enforce width to prevent expansion
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.white.opacity(0.05))
+                .fill(Color.white.opacity(0.08)) // Slightly brighter background
                 .blur(radius: 0.5)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16)
-                .stroke(LinearGradient(colors: [.white.opacity(0.2), .clear], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
+                .stroke(LinearGradient(colors: [.white.opacity(0.4), .clear], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1) // More visible outer border
         )
+        .clipped() // Ensure no inner elements bleed out horizontally
     }
 }

@@ -34,6 +34,7 @@ struct PlayerView: View {
                         .onAppear {
                             startTime = Date()
                             startTimer()
+                            player?.play() // Reinforce play on appear
                         }
                         .onDisappear {
                             stopTimer()
@@ -94,6 +95,14 @@ struct PlayerView: View {
         }
         .navigationBarHidden(true)
         .onAppear {
+            // Configure Audio Session once for the entire session
+            do {
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+                try AVAudioSession.sharedInstance().setActive(true)
+            } catch {
+                print("Failed to set audio session category: \(error)")
+            }
+
             currentIndex = initialIndex
             if currentItem.type == .video {
                 setupVideoPlayer()
@@ -116,10 +125,14 @@ struct PlayerView: View {
 
         if let url = URL(string: currentItem.uri) {
             player = AVPlayer(url: url)
+            player?.automaticallyWaitsToMinimizeStalling = true
             playerViewController = AVPlayerViewController()
             playerViewController?.player = player
             playerViewController?.allowsPictureInPicturePlayback = false
             playerViewController?.showsPlaybackControls = true
+            if #available(iOS 16.0, *) {
+                playerViewController?.allowsDisplayingPlaybackRateControls = false
+            }
             player?.play()
 
             // Observe playback completion
@@ -134,6 +147,8 @@ struct PlayerView: View {
     }
 
     private func startTimer() {
+        // Ensure any existing timer is invalidated before starting a new one
+        timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
             store.incrementUsedTime(seconds: 1)
         }
@@ -199,8 +214,14 @@ struct PlayerViewControllerRepresentable: UIViewControllerRepresentable {
     let playerViewController: AVPlayerViewController
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
-        playerViewController
+        playerViewController.player?.play() // Reinforce playback when UI is ready
+        return playerViewController
     }
 
-    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
+        // Ensure the correct player is used
+        if uiViewController.player != playerViewController.player {
+            uiViewController.player = playerViewController.player
+        }
+    }
 }
