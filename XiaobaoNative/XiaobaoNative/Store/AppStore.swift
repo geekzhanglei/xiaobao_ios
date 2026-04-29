@@ -25,7 +25,16 @@ class AppStore: ObservableObject {
         let cachedCategories = getCachedCategories()
         let contentCategories = content.map(\.category)
 
-        categories = mergeCategories(dbCategories, cachedCategories, contentCategories)
+        var merged = mergeCategories(dbCategories, cachedCategories, contentCategories)
+        
+        // Ensure at least one default category exists
+        if merged.isEmpty {
+            let defaultCategory = "默认"
+            merged.append(defaultCategory)
+            cacheCategory(defaultCategory)
+        }
+        
+        categories = merged
         print("AppStore: 加载分类完成，共 \(categories.count) 个: \(categories)")
     }
 

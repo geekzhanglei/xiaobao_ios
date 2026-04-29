@@ -124,14 +124,19 @@ struct PlayerView: View {
         playerViewController = nil
 
         if let url = URL(string: currentItem.uri) {
-            player = AVPlayer(url: url)
+            let playerItem = AVPlayerItem(url: url)
+            // Use .timeDomain pitch algorithm to help with audio/video synchronization
+            playerItem.audioTimePitchAlgorithm = .timeDomain
+            
+            player = AVPlayer(playerItem: playerItem)
             player?.automaticallyWaitsToMinimizeStalling = true
+            
             playerViewController = AVPlayerViewController()
             playerViewController?.player = player
             playerViewController?.allowsPictureInPicturePlayback = false
             playerViewController?.showsPlaybackControls = true
             if #available(iOS 16.0, *) {
-                playerViewController?.allowsDisplayingPlaybackRateControls = false
+                playerViewController?.speeds = []
             }
             player?.play()
 
