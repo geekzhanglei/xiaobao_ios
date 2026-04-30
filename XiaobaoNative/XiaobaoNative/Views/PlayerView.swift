@@ -123,14 +123,20 @@ struct PlayerView: View {
         player = nil
         playerViewController = nil
 
-        if let url = URL(string: currentItem.uri) {
+        // Remove existing observer
+        if let observer = playerItemObserver {
+            NotificationCenter.default.removeObserver(observer)
+            playerItemObserver = nil
+        }
+
+        if let url = URL(string: currentItem.validURI) {
             let playerItem = AVPlayerItem(url: url)
             // Use .timeDomain pitch algorithm to help with audio/video synchronization
             playerItem.audioTimePitchAlgorithm = .timeDomain
-            
+
             player = AVPlayer(playerItem: playerItem)
             player?.automaticallyWaitsToMinimizeStalling = true
-            
+
             playerViewController = AVPlayerViewController()
             playerViewController?.player = player
             playerViewController?.allowsPictureInPicturePlayback = false
@@ -140,8 +146,8 @@ struct PlayerView: View {
             }
             player?.play()
 
-            // Observe playback completion
-            NotificationCenter.default.addObserver(
+            // Observe playback completion and save reference
+            playerItemObserver = NotificationCenter.default.addObserver(
                 forName: .AVPlayerItemDidPlayToEndTime,
                 object: player?.currentItem,
                 queue: .main
@@ -179,7 +185,7 @@ struct ImageViewer: View {
 
     var body: some View {
         ScrollView([.horizontal, .vertical], showsIndicators: false) {
-            AsyncImage(url: URL(string: item.uri)) { phase in
+            AsyncImage(url: URL(string: item.validURI)) { phase in
                 switch phase {
                 case .empty:
                     ProgressView()

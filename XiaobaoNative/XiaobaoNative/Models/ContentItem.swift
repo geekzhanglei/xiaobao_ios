@@ -15,6 +15,57 @@ struct ContentItem: Codable, Identifiable, Equatable {
     let duration: Int?
     var sortIndex: Int
     
+    var validCover: String? {
+        guard let cover = cover else { return nil }
+        return resolvePath(cover)
+    }
+
+    var validURI: String {
+        return resolvePath(uri) ?? uri
+    }
+
+    private func resolvePath(_ path: String) -> String? {
+        // Handle relative path schemes
+        if path.hasPrefix("documents://") {
+            let filename = path.replacingOccurrences(of: "documents://", with: "")
+            let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            return documentsURL?.appendingPathComponent(filename).absoluteString
+        }
+        
+        if path.hasPrefix("appsupport://") {
+            let relativePath = path.replacingOccurrences(of: "appsupport://", with: "")
+            let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            return appSupportURL?.appendingPathComponent(relativePath).absoluteString
+        }
+
+        // If it's not a local file path, return as is
+        guard path.contains("file://") || path.hasPrefix("/") else { return path }
+        
+        let url: URL
+        if path.hasPrefix("/") {
+            url = URL(fileURLWithPath: path)
+        } else if let u = URL(string: path) {
+            url = u
+        } else {
+            return path
+        }
+        
+        let filename = url.lastPathComponent
+        let pathString = url.path
+        
+        // If it's in Thumbnails folder (Application Support)
+        if pathString.contains("/Library/Application Support/") || pathString.contains("/Thumbnails/") {
+            let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            // Reconstruct the path relative to Application Support
+            // Most thumbnails are in Library/Application Support/Thumbnails/
+            return appSupportURL?.appendingPathComponent("Thumbnails").appendingPathComponent(filename).absoluteString
+        }
+        
+        // Default to Documents folder for other local files (videos/images)
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        return documentsURL?.appendingPathComponent(filename).absoluteString
+    }
+
     init(id: String = UUID().uuidString, type: ContentType, title: String? = nil, cover: String? = nil, uri: String, category: String, duration: Int? = nil, sortIndex: Int = 0) {
         self.id = id
         self.type = type

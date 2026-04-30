@@ -12,16 +12,27 @@ class AppStore: ObservableObject {
 
     init() {
         checkMidnightReset()
+        ensureDefaultCategoryExists()
         loadContent()
         loadCategories()
         loadLearningState()
+    }
+
+    private func ensureDefaultCategoryExists() {
+        // Ensure default category exists in database
+        if db.addCategory(name: "默认") == nil {
+            // Category already exists or failed to add, ensure it's in cache
+            cacheCategory("默认")
+        } else {
+            cacheCategory("默认")
+        }
     }
 
     private func checkMidnightReset() {
         let lastResetKey = "xiaobao.lastResetDate"
         let now = Date()
         let calendar = Calendar.current
-        
+
         if let lastReset = UserDefaults.standard.object(forKey: lastResetKey) as? Date {
             if !calendar.isDate(lastReset, inSameDayAs: now) {
                 resetUsedTime()
@@ -43,14 +54,21 @@ class AppStore: ObservableObject {
 
         // Prioritize cachedCategories to preserve custom ordering
         var merged = mergeCategories(cachedCategories, dbCategories, contentCategories)
-        
-        // Ensure at least one default category exists
-        if merged.isEmpty {
-            let defaultCategory = "默认"
-            merged.append(defaultCategory)
-            cacheCategory(defaultCategory)
+
+        // Ensure '默认' category always exists in the DB and list
+        if !merged.contains("默认") {
+            db.addCategory(name: "默认")
+            merged.insert("默认", at: 0)
+            cacheCategory("默认")
+        } else {
+            // If '默认' exists but is not at first position, move it to first
+            if let index = merged.firstIndex(of: "默认"), index != 0 {
+                merged.remove(at: index)
+                merged.insert("默认", at: 0)
+                saveCachedCategories(merged)
+            }
         }
-        
+
         categories = merged
         print("AppStore: 加载分类完成，共 \(categories.count) 个: \(categories)")
     }
@@ -63,15 +81,48 @@ class AppStore: ObservableObject {
         addContents([item])
     }
 
-    func addContents(_ items: [ContentItem]) {
-        guard !items.isEmpty else { return }
+    func addContents(_ items: [ContentItem], completion: (() -> Void)? = nil) {
+        guard !items.isEmpty else {
+            completion?()
+            return
+        }
+        
         print("AppStore: 批量添加 \(items.count) 个内容")
-        for item in items {
-            db.addContent(item)
+        
+        // Normalize paths to relative format before saving to DB for stability
+        let normalizedItems = items.map { item -> ContentItem in
+            var newItem = item
+            newItem = ContentItem(
+                id: item.id,
+                type: item.type,
+                title: item.title,
+                cover: toRelativePath(item.cover),
+                uri: toRelativePath(item.uri) ?? item.uri,
+                category: item.category,
+                duration: item.duration,
+                sortIndex: item.sortIndex
+            )
+            return newItem
+        }
+
+        // Cache categories first (fast)
+        for item in normalizedItems {
             cacheCategory(item.category)
         }
-        loadContent()
-        loadCategories()
+
+        db.addContentsBatch(normalizedItems) { [weak self] in
+            guard let self = self else { return }
+            self.loadContent()
+            
+            // Only reload categories if new categories were added
+            let newCategories = Set(normalizedItems.map(\.category))
+            let hasNewCategories = !newCategories.isSubset(of: Set(self.categories))
+            if hasNewCategories {
+                self.loadCategories()
+            }
+            
+            completion?()
+        }
     }
 
     func deleteContent(id: String) {
@@ -82,15 +133,15 @@ class AppStore: ObservableObject {
     func moveContent(from source: IndexSet, to destination: Int, in category: String) {
         var categoryContent = content.filter { $0.category == category }
         categoryContent.move(fromOffsets: source, toOffset: destination)
-        
+
         // Update sort indices for all items in this category
         for (index, _) in categoryContent.enumerated() {
             categoryContent[index].sortIndex = index
         }
-        
+
         // Update DB
         db.updateContentIndices(items: categoryContent)
-        
+
         // Reload
         loadContent()
     }
@@ -107,10 +158,16 @@ class AppStore: ObservableObject {
             return nil
         }
 
-        let addedCategory = db.addCategory(name: normalizedName) ?? normalizedName
-        cacheCategory(addedCategory)
-        loadCategories()
-        return addedCategory
+        if let addedCategory = db.addCategory(name: normalizedName) {
+            cacheCategory(addedCategory)
+            
+            // Optimization: if it's already in our categories list, don't trigger a full reload
+            if !categories.contains(addedCategory) {
+                loadCategories()
+            }
+            return addedCategory
+        }
+        return nil
     }
 
     @discardableResult
@@ -123,11 +180,11 @@ class AppStore: ObservableObject {
 
         let renamedCategory = db.renameCategory(oldName: normalizedOldName, newName: normalizedNewName) ?? normalizedNewName
         renameCachedCategory(oldName: normalizedOldName, newName: renamedCategory)
-        
+
         // Critical: reload content first so the categories derived from content reflect the change
         loadContent()
         loadCategories()
-        
+
         return renamedCategory
     }
 
@@ -172,6 +229,33 @@ class AppStore: ObservableObject {
 
     private func normalizedCategoryName(_ name: String) -> String {
         name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func toRelativePath(_ path: String?) -> String? {
+        guard let path = path else { return nil }
+        guard path.contains("file://") || path.hasPrefix("/") else { return path }
+        
+        let url: URL
+        if path.hasPrefix("/") {
+            url = URL(fileURLWithPath: path)
+        } else if let u = URL(string: path) {
+            url = u
+        } else {
+            return path
+        }
+        
+        let pathString = url.path
+        let filename = url.lastPathComponent
+        
+        if pathString.contains("/Library/Application Support/") || pathString.contains("/Thumbnails/") {
+            return "appsupport://Thumbnails/\(filename)"
+        }
+        
+        if pathString.contains("/Documents/") {
+            return "documents://\(filename)"
+        }
+        
+        return path
     }
 
     private func mergeCategories(_ groups: [String]...) -> [String] {

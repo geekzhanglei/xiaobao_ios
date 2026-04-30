@@ -156,7 +156,7 @@ struct ParentView: View {
                             } label: {
                                 Label("重命名", systemImage: "pencil")
                             }
-                            
+
                             if (contentByCategory[category]?.isEmpty ?? true) {
                                 Button(role: .destructive) {
                                     store.deleteCategory(name: category)
@@ -212,7 +212,7 @@ struct ParentView: View {
                         } else {
                             ForEach(items, id: \.id) { item in
                                 HStack(spacing: 12) {
-                                    let thumbnailURL = item.cover ?? (item.type == .image ? item.uri : nil)
+                                    let thumbnailURL = item.validCover ?? (item.type == .image ? item.validURI : nil)
                                     if let thumbnailURL = thumbnailURL {
                                         AsyncImage(url: URL(string: thumbnailURL)) { phase in
                                             switch phase {
@@ -271,15 +271,23 @@ struct ParentView: View {
         .sheet(isPresented: $showImagePicker) {
             let targetCategory = categoryForPicker
             ImagePicker { urls in
-                let items = urls.map { url in
-                    ContentItem(
-                        type: .image,
-                        title: "图片",
-                        uri: url.absoluteString,
-                        category: targetCategory
-                    )
+                if urls.isEmpty { return }
+                isProcessing = true
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let items = urls.map { url in
+                        ContentItem(
+                            type: .image,
+                            title: "图片",
+                            uri: url.absoluteString,
+                            category: targetCategory
+                        )
+                    }
+                    DispatchQueue.main.async {
+                        store.addContents(items) {
+                            isProcessing = false
+                        }
+                    }
                 }
-                store.addContents(items)
             }
         }
         .sheet(isPresented: $showVideoPicker) {
@@ -299,8 +307,9 @@ struct ParentView: View {
                         )
                     }
                     DispatchQueue.main.async {
-                        store.addContents(items)
-                        isProcessing = false
+                        store.addContents(items) {
+                            isProcessing = false
+                        }
                     }
                 }
             }
@@ -322,8 +331,9 @@ struct ParentView: View {
                         )
                     }
                     DispatchQueue.main.async {
-                        store.addContents(items)
-                        isProcessing = false
+                        store.addContents(items) {
+                            isProcessing = false
+                        }
                     }
                 }
             }

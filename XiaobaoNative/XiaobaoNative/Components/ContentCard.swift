@@ -6,7 +6,7 @@ struct ContentCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack {
-                let coverURL = item.cover ?? (item.type == .image ? item.uri : nil)
+                let coverURL = item.validCover ?? (item.type == .image ? item.validURI : nil)
                 if let coverURL = coverURL {
                     AsyncImage(url: URL(string: coverURL)) { phase in
                         switch phase {

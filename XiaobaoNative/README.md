@@ -128,8 +128,23 @@ XiaobaoNative/
 
 ## 后续优化
 
-- [ ] 视频缩略图生成（AVAssetImageGenerator）
 - [ ] 数据迁移工具 UI
 - [ ] 更多主题颜色
 - [ ] 播放历史记录
 - [ ] 学习报告统计
+
+## 性能优化与Bug修复
+
+### v1.1 (2026-04-30)
+
+**性能优化**
+- 添加视频缩略图缓存机制，避免重复生成相同视频的缩略图
+- 图片/视频添加改为后台线程处理，避免UI卡顿
+- 优化PlayerView内存管理，修复notification observer泄漏
+- 优化分类加载性能，添加内容时只在新增分类时才重新加载分类，避免全量合并操作
+
+**Bug修复**
+- 修复默认分类不显示问题，确保"默认"分类始终在第一位
+- 修复默认分类初始化问题，在AppStore初始化时确保默认分类天然存在
+- 修复iPad全屏显示问题，添加LaunchScreen.storyboard和UIRequiresFullScreen配置
+- 修复PlayerView编译错误（weak引用问题）

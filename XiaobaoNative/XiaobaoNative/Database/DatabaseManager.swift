@@ -19,7 +19,9 @@ class DatabaseManager {
     }()
 
     var context: NSManagedObjectContext {
-        return persistentContainer.viewContext
+        let context = persistentContainer.viewContext
+        context.automaticallyMergesChangesFromParent = true
+        return context
     }
 
     private init() {}
@@ -40,27 +42,13 @@ class DatabaseManager {
 
     func getAllContent() -> [ContentItem] {
         let request: NSFetchRequest<NSManagedObject> = NSFetchRequest(entityName: "ContentEntity")
+        request.sortDescriptors = [NSSortDescriptor(key: "sortIndex", ascending: true)]
 
         do {
             let entities = try context.fetch(request)
-            var seenIDs = Set<String>()
-            var didRepairIDs = false
-
-            let items = entities.map { entity in
-                var id = entity.value(forKey: "id") as? String ?? ""
-
-                // Repair historical records with missing or duplicate ids so single-item deletion
-                // only targets the intended record.
-                if id.isEmpty || seenIDs.contains(id) {
-                    id = UUID().uuidString
-                    entity.setValue(id, forKey: "id")
-                    didRepairIDs = true
-                }
-
-                seenIDs.insert(id)
-
-                return ContentItem(
-                    id: id,
+            return entities.map { entity in
+                ContentItem(
+                    id: entity.value(forKey: "id") as? String ?? UUID().uuidString,
                     type: ContentType(rawValue: entity.value(forKey: "type") as? String ?? "video") ?? .video,
                     title: entity.value(forKey: "title") as? String,
                     cover: entity.value(forKey: "cover") as? String,
@@ -70,13 +58,6 @@ class DatabaseManager {
                     sortIndex: entity.value(forKey: "sortIndex") as? Int ?? 0
                 )
             }
-            
-            if didRepairIDs {
-                save()
-            }
-            
-            // Return items sorted by their index
-            return items.sorted(by: { $0.sortIndex < $1.sortIndex })
         } catch {
             print("Error fetching content: \(error)")
             return []
@@ -84,17 +65,48 @@ class DatabaseManager {
     }
 
     func addContent(_ item: ContentItem) {
-        let contentID = item.id.isEmpty ? UUID().uuidString : item.id
-        let entity = NSEntityDescription.insertNewObject(forEntityName: "ContentEntity", into: context)
-        entity.setValue(contentID, forKey: "id")
-        entity.setValue(item.type.rawValue, forKey: "type")
-        entity.setValue(item.title, forKey: "title")
-        entity.setValue(item.cover, forKey: "cover")
-        entity.setValue(item.uri, forKey: "uri")
-        entity.setValue(item.category, forKey: "category")
-        entity.setValue(item.duration, forKey: "duration")
-        entity.setValue(item.sortIndex, forKey: "sortIndex")
-        save()
+        addContentsBatch([item])
+    }
+
+    func addContentsBatch(_ items: [ContentItem], completion: (() -> Void)? = nil) {
+        guard !items.isEmpty else {
+            completion?()
+            return
+        }
+        
+        persistentContainer.performBackgroundTask { context in
+            for item in items {
+                let contentID = item.id.isEmpty ? UUID().uuidString : item.id
+                let entity = NSEntityDescription.insertNewObject(forEntityName: "ContentEntity", into: context)
+                entity.setValue(contentID, forKey: "id")
+                entity.setValue(item.type.rawValue, forKey: "type")
+                entity.setValue(item.title, forKey: "title")
+                entity.setValue(item.cover, forKey: "cover")
+                entity.setValue(item.uri, forKey: "uri")
+                entity.setValue(item.category, forKey: "category")
+                entity.setValue(item.duration, forKey: "duration")
+                entity.setValue(item.sortIndex, forKey: "sortIndex")
+            }
+            
+            if context.hasChanges {
+                do {
+                    try context.save()
+                    print("DatabaseManager: 批量保存 \(items.count) 个内容成功")
+                    DispatchQueue.main.async {
+                        completion?()
+                    }
+                } catch {
+                    print("Failed to save background context: \(error)")
+                    DispatchQueue.main.async {
+                        completion?()
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    completion?()
+                }
+            }
+        }
     }
 
     func updateContentIndices(items: [ContentItem]) {
@@ -151,33 +163,68 @@ class DatabaseManager {
     func addCategory(name: String) -> String? {
         let normalizedName = normalizedCategoryName(name)
         guard !normalizedName.isEmpty else {
-            print("DatabaseManager: 分类名称为空，跳过保存")
             return nil
         }
 
-        print("DatabaseManager: 添加分类 \(normalizedName)")
         let request: NSFetchRequest<NSManagedObject> = NSFetchRequest(entityName: "CategoryEntity")
+        request.predicate = NSPredicate(format: "name ==[c] %@", normalizedName)
 
         do {
             let entities = try context.fetch(request)
-            let existingName = entities
-                .compactMap { $0.value(forKey: "name") as? String }
-                .map(normalizedCategoryName)
-                .first { $0.localizedCaseInsensitiveCompare(normalizedName) == .orderedSame }
-
-            if let existingName {
-                print("DatabaseManager: 分类已存在，跳过")
-                return existingName
+            if let existing = entities.first {
+                return existing.value(forKey: "name") as? String
             }
 
             let entity = NSEntityDescription.insertNewObject(forEntityName: "CategoryEntity", into: context)
             entity.setValue(normalizedName, forKey: "name")
             save()
-            print("DatabaseManager: 分类保存成功")
             return normalizedName
         } catch {
-            print("Error checking category: \(error)")
+            print("Error checking/adding category: \(error)")
             return nil
+        }
+    }
+
+    func addCategoriesBatch(_ names: [String], completion: (() -> Void)? = nil) {
+        let normalizedNames = names.map(normalizedCategoryName).filter { !$0.isEmpty }
+        guard !normalizedNames.isEmpty else {
+            completion?()
+            return
+        }
+
+        persistentContainer.performBackgroundTask { context in
+            for name in normalizedNames {
+                let request: NSFetchRequest<NSManagedObject> = NSFetchRequest(entityName: "CategoryEntity")
+                request.predicate = NSPredicate(format: "name ==[c] %@", name)
+                
+                do {
+                    let entities = try context.fetch(request)
+                    if entities.isEmpty {
+                        let entity = NSEntityDescription.insertNewObject(forEntityName: "CategoryEntity", into: context)
+                        entity.setValue(name, forKey: "name")
+                    }
+                } catch {
+                    print("Error checking category in batch: \(error)")
+                }
+            }
+            
+            if context.hasChanges {
+                do {
+                    try context.save()
+                    DispatchQueue.main.async {
+                        completion?()
+                    }
+                } catch {
+                    print("Failed to save background categories: \(error)")
+                    DispatchQueue.main.async {
+                        completion?()
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    completion?()
+                }
+            }
         }
     }
 
