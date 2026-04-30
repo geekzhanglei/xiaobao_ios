@@ -12,7 +12,11 @@ struct ParentView: View {
     @State private var showEditAlert = false
     @State private var showAlert = false
     @State private var alertMessage = ""
+    @State private var isProcessing = false
     @AppStorage("xiaobao.selectedCategory") private var selectedCategory: String = ""
+    /// The category that was active when a picker was opened – avoids
+    /// stale-closure issues with @AppStorage inside .sheet callbacks.
+    @State private var categoryForPicker: String = ""
     private let selectedCategoryKey = "xiaobao.selectedCategory"
 
     private var contentByCategory: [String: [ContentItem]] {
@@ -50,6 +54,7 @@ struct ParentView: View {
     }
 
     var body: some View {
+        let contentGrouped = contentByCategory
         NavigationView {
             List {
                 Section("学习时长") {
@@ -167,12 +172,13 @@ struct ParentView: View {
                     .onMove(perform: store.moveCategory)
                 }
 
-                Section("添加内容") {
+                Section("添加内容 → \(selectedCategory.isEmpty ? (store.categories.first ?? "默认") : selectedCategory)") {
                     Button("选择图片") {
                         if store.categories.isEmpty {
                             alertMessage = "请先创建分类"
                             showAlert = true
                         } else {
+                            categoryForPicker = selectedCategory.isEmpty ? (store.categories.first ?? "默认") : selectedCategory
                             showImagePicker = true
                         }
                     }
@@ -181,6 +187,7 @@ struct ParentView: View {
                             alertMessage = "请先创建分类"
                             showAlert = true
                         } else {
+                            categoryForPicker = selectedCategory.isEmpty ? (store.categories.first ?? "默认") : selectedCategory
                             showVideoPicker = true
                         }
                     }
@@ -189,58 +196,57 @@ struct ParentView: View {
                             alertMessage = "请先创建分类"
                             showAlert = true
                         } else {
+                            categoryForPicker = selectedCategory.isEmpty ? (store.categories.first ?? "默认") : selectedCategory
                             showDocumentPicker = true
                         }
                     }
                 }
 
-                Section("内容列表") {
-                    ForEach(store.categories, id: \.self) { category in
-                        Section(header: Text(category)) {
-                            let items = contentByCategory[category] ?? []
-                            if items.isEmpty {
-                                Text("暂无内容")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            } else {
-                                ForEach(items, id: \.id) { item in
-                                    HStack(spacing: 12) {
-                                        let thumbnailURL = item.cover ?? (item.type == .image ? item.uri : nil)
-                                        if let thumbnailURL = thumbnailURL {
-                                            AsyncImage(url: URL(string: thumbnailURL)) { phase in
-                                                switch phase {
-                                                case .empty:
-                                                    ProgressView()
-                                                        .frame(width: 50, height: 50)
-                                                case .success(let image):
-                                                    image.resizable().aspectRatio(contentMode: .fill)
-                                                        .frame(width: 50, height: 50).cornerRadius(8)
-                                                case .failure:
-                                                    Image(systemName: "photo").frame(width: 50, height: 50).background(Color.gray.opacity(0.3)).cornerRadius(8)
-                                                @unknown default: EmptyView()
-                                                }
+                ForEach(store.categories, id: \.self) { category in
+                    Section(header: Text("内容 - \(category)")) {
+                        let items = contentGrouped[category] ?? []
+                        if items.isEmpty {
+                            Text("暂无内容")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            ForEach(items, id: \.id) { item in
+                                HStack(spacing: 12) {
+                                    let thumbnailURL = item.cover ?? (item.type == .image ? item.uri : nil)
+                                    if let thumbnailURL = thumbnailURL {
+                                        AsyncImage(url: URL(string: thumbnailURL)) { phase in
+                                            switch phase {
+                                            case .empty:
+                                                ProgressView()
+                                                    .frame(width: 50, height: 50)
+                                            case .success(let image):
+                                                image.resizable().aspectRatio(contentMode: .fill)
+                                                    .frame(width: 50, height: 50).cornerRadius(8)
+                                            case .failure:
+                                                Image(systemName: "photo").frame(width: 50, height: 50).background(Color.gray.opacity(0.3)).cornerRadius(8)
+                                            @unknown default: EmptyView()
                                             }
-                                        } else {
-                                            Image(systemName: item.type == .video ? "video" : "photo")
-                                                .frame(width: 50, height: 50).background(Color.gray.opacity(0.3)).cornerRadius(8)
                                         }
-
-                                        VStack(alignment: .leading) {
-                                            Text(item.title ?? "无标题").font(.subheadline)
-                                            Text(item.type.rawValue).font(.caption).foregroundColor(.secondary)
-                                        }
-                                        Spacer()
-                                        Button(role: .destructive) {
-                                            store.deleteContent(id: item.id)
-                                        } label: {
-                                            Image(systemName: "trash")
-                                        }
-                                        .buttonStyle(.borderless)
+                                    } else {
+                                        Image(systemName: item.type == .video ? "video" : "photo")
+                                            .frame(width: 50, height: 50).background(Color.gray.opacity(0.3)).cornerRadius(8)
                                     }
+
+                                    VStack(alignment: .leading) {
+                                        Text(item.title ?? "无标题").font(.subheadline)
+                                        Text(item.type.rawValue).font(.caption).foregroundColor(.secondary)
+                                    }
+                                    Spacer()
+                                    Button(role: .destructive) {
+                                        store.deleteContent(id: item.id)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                    .buttonStyle(.borderless)
                                 }
-                                .onMove { from, to in
-                                    store.moveContent(from: from, to: to, in: category)
-                                }
+                            }
+                            .onMove { from, to in
+                                store.moveContent(from: from, to: to, in: category)
                             }
                         }
                     }
@@ -263,50 +269,62 @@ struct ParentView: View {
         }
         .navigationViewStyle(StackNavigationViewStyle())
         .sheet(isPresented: $showImagePicker) {
+            let targetCategory = categoryForPicker
             ImagePicker { urls in
-                for url in urls {
-                    let category = selectedCategory.isEmpty ? (store.categories.first ?? "默认") : selectedCategory
-                    let item = ContentItem(
+                let items = urls.map { url in
+                    ContentItem(
                         type: .image,
                         title: "图片",
                         uri: url.absoluteString,
-                        category: category
+                        category: targetCategory
                     )
-                    store.addContent(item)
                 }
+                store.addContents(items)
             }
         }
         .sheet(isPresented: $showVideoPicker) {
+            let targetCategory = categoryForPicker
             VideoPicker { urls in
-                for url in urls {
-                    let category = selectedCategory.isEmpty ? (store.categories.first ?? "默认") : selectedCategory
-                    // Generate thumbnail for video
-                    let thumbnailURL = VideoThumbnailGenerator.generateThumbnail(from: url)
-                    let item = ContentItem(
-                        type: .video,
-                        title: "视频",
-                        cover: thumbnailURL?.absoluteString,
-                        uri: url.absoluteString,
-                        category: category
-                    )
-                    store.addContent(item)
+                if urls.isEmpty { return }
+                isProcessing = true
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let items = urls.map { url in
+                        let thumbnailURL = VideoThumbnailGenerator.generateThumbnail(from: url)
+                        return ContentItem(
+                            type: .video,
+                            title: "视频",
+                            cover: thumbnailURL?.absoluteString,
+                            uri: url.absoluteString,
+                            category: targetCategory
+                        )
+                    }
+                    DispatchQueue.main.async {
+                        store.addContents(items)
+                        isProcessing = false
+                    }
                 }
             }
         }
         .sheet(isPresented: $showDocumentPicker) {
+            let targetCategory = categoryForPicker
             DocumentPicker { urls in
-                for url in urls {
-                    let category = selectedCategory.isEmpty ? (store.categories.first ?? "默认") : selectedCategory
-                    // Generate thumbnail for video
-                    let thumbnailURL = VideoThumbnailGenerator.generateThumbnail(from: url)
-                    let item = ContentItem(
-                        type: .video,
-                        title: url.lastPathComponent,
-                        cover: thumbnailURL?.absoluteString,
-                        uri: url.absoluteString,
-                        category: category
-                    )
-                    store.addContent(item)
+                if urls.isEmpty { return }
+                isProcessing = true
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let items = urls.map { url in
+                        let thumbnailURL = VideoThumbnailGenerator.generateThumbnail(from: url)
+                        return ContentItem(
+                            type: .video,
+                            title: url.lastPathComponent,
+                            cover: thumbnailURL?.absoluteString,
+                            uri: url.absoluteString,
+                            category: targetCategory
+                        )
+                    }
+                    DispatchQueue.main.async {
+                        store.addContents(items)
+                        isProcessing = false
+                    }
                 }
             }
         }
@@ -348,6 +366,23 @@ struct ParentView: View {
         }
         .onAppear {
             syncSelectedCategory(with: store.categories)
+        }
+        .overlay {
+            if isProcessing {
+                ZStack {
+                    Color.black.opacity(0.4).ignoresSafeArea()
+                    VStack(spacing: 15) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("正在处理资源...")
+                            .foregroundColor(.white)
+                            .font(.headline)
+                    }
+                    .padding(30)
+                    .background(Color.secondary.opacity(0.8))
+                    .cornerRadius(15)
+                }
+            }
         }
         .onChange(of: store.categories) { categories in
             syncSelectedCategory(with: categories)

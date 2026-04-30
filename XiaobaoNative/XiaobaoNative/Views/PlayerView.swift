@@ -97,7 +97,7 @@ struct PlayerView: View {
         .onAppear {
             // Configure Audio Session once for the entire session
             do {
-                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
                 try AVAudioSession.sharedInstance().setActive(true)
             } catch {
                 print("Failed to set audio session category: \(error)")

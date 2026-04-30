@@ -11,9 +11,25 @@ class AppStore: ObservableObject {
     private let categoryCacheKey = "xiaobao.customCategories"
 
     init() {
+        checkMidnightReset()
         loadContent()
         loadCategories()
         loadLearningState()
+    }
+
+    private func checkMidnightReset() {
+        let lastResetKey = "xiaobao.lastResetDate"
+        let now = Date()
+        let calendar = Calendar.current
+        
+        if let lastReset = UserDefaults.standard.object(forKey: lastResetKey) as? Date {
+            if !calendar.isDate(lastReset, inSameDayAs: now) {
+                resetUsedTime()
+                UserDefaults.standard.set(now, forKey: lastResetKey)
+            }
+        } else {
+            UserDefaults.standard.set(now, forKey: lastResetKey)
+        }
     }
 
     func loadContent() {
@@ -25,7 +41,8 @@ class AppStore: ObservableObject {
         let cachedCategories = getCachedCategories()
         let contentCategories = content.map(\.category)
 
-        var merged = mergeCategories(dbCategories, cachedCategories, contentCategories)
+        // Prioritize cachedCategories to preserve custom ordering
+        var merged = mergeCategories(cachedCategories, dbCategories, contentCategories)
         
         // Ensure at least one default category exists
         if merged.isEmpty {
@@ -43,8 +60,16 @@ class AppStore: ObservableObject {
     }
 
     func addContent(_ item: ContentItem) {
-        db.addContent(item)
-        cacheCategory(item.category)
+        addContents([item])
+    }
+
+    func addContents(_ items: [ContentItem]) {
+        guard !items.isEmpty else { return }
+        print("AppStore: 批量添加 \(items.count) 个内容")
+        for item in items {
+            db.addContent(item)
+            cacheCategory(item.category)
+        }
         loadContent()
         loadCategories()
     }
