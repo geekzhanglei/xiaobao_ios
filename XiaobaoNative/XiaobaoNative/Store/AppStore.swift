@@ -130,6 +130,11 @@ class AppStore: ObservableObject {
         loadContent()
     }
 
+    func deleteAllData() {
+        db.deleteAllContent()
+        loadContent()
+    }
+
     func moveContent(from source: IndexSet, to destination: Int, in category: String) {
         var categoryContent = content.filter { $0.category == category }
         categoryContent.move(fromOffsets: source, toOffset: destination)

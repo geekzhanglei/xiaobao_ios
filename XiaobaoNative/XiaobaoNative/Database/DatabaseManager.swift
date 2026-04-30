@@ -141,6 +141,26 @@ class DatabaseManager {
         }
     }
 
+    func deleteAllContent() {
+        let request: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: "ContentEntity")
+        let deleteRequest = NSBatchDeleteRequest(fetchRequest: request)
+
+        do {
+            try context.execute(deleteRequest)
+            save()
+        } catch {
+            print("Error deleting all content: \(error)")
+            // Fallback if batch delete fails
+            let fetchRequest: NSFetchRequest<NSManagedObject> = NSFetchRequest(entityName: "ContentEntity")
+            if let entities = try? context.fetch(fetchRequest) {
+                for entity in entities {
+                    context.delete(entity)
+                }
+                save()
+            }
+        }
+    }
+
     func getAllCategories() -> [String] {
         let request: NSFetchRequest<NSManagedObject> = NSFetchRequest(entityName: "CategoryEntity")
         request.sortDescriptors = [NSSortDescriptor(key: "name", ascending: true)]

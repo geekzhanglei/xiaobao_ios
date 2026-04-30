@@ -11,6 +11,7 @@ struct ParentView: View {
     @State private var renameTo = ""
     @State private var showEditAlert = false
     @State private var showAlert = false
+    @State private var showDeleteAllAlert = false
     @State private var alertMessage = ""
     @State private var isProcessing = false
     @AppStorage("xiaobao.selectedCategory") private var selectedCategory: String = ""
@@ -202,6 +203,21 @@ struct ParentView: View {
                     }
                 }
 
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteAllAlert = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text("一键清空所有已添加资源")
+                                .fontWeight(.bold)
+                            Spacer()
+                        }
+                    }
+                } header: {
+                    Text("数据重置")
+                }
+
                 ForEach(store.categories, id: \.self) { category in
                     Section(header: Text("内容 - \(category)")) {
                         let items = contentGrouped[category] ?? []
@@ -373,6 +389,14 @@ struct ParentView: View {
             Button("确定") {}
         } message: {
             Text(alertMessage)
+        }
+        .alert("确定删除所有数据吗？", isPresented: $showDeleteAllAlert) {
+            Button("取消", role: .cancel) {}
+            Button("确认删除", role: .destructive) {
+                store.deleteAllData()
+            }
+        } message: {
+            Text("此操作将永久删除所有已添加的内容，无法撤销。")
         }
         .onAppear {
             syncSelectedCategory(with: store.categories)
