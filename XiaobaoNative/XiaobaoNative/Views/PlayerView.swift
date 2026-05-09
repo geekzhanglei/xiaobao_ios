@@ -1,181 +1,301 @@
-import SwiftUI
 import AVKit
+import SwiftUI
 
 struct PlayerView: View {
     let items: [ContentItem]
     let initialIndex: Int
+
     @EnvironmentObject var store: AppStore
     @Environment(\.dismiss) private var dismiss
-    @State private var player: AVPlayer?
-    @State private var playerViewController: AVPlayerViewController?
-    @State private var startTime: Date?
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var videoController = VideoPlayerController()
     @State private var timer: Timer?
     @State private var scale: CGFloat = 1.0
-    @State private var playerItemObserver: Any?
     @State private var currentIndex: Int = 0
 
-    private var currentItem: ContentItem {
-        items[currentIndex]
+    private var currentItem: ContentItem? {
+        guard items.indices.contains(currentIndex) else { return nil }
+        return items[currentIndex]
     }
 
     init(items: [ContentItem], initialIndex: Int = 0) {
         self.items = items
         self.initialIndex = initialIndex
+        _currentIndex = State(initialValue: min(max(initialIndex, 0), max(items.count - 1, 0)))
     }
 
     var body: some View {
         ZStack {
-            Color.black
-                .ignoresSafeArea()
+            Color.black.ignoresSafeArea()
 
-            if currentItem.type == .video {
-                if let playerViewController = playerViewController {
-                    PlayerViewControllerRepresentable(playerViewController: playerViewController)
-                        .onAppear {
-                            startTime = Date()
-                            startTimer()
-                            player?.play() // Reinforce play on appear
-                        }
-                        .onDisappear {
-                            stopTimer()
-                        }
-                        .overlay(
-                            Button(action: {
-                                dismiss()
-                            }) {
-                                Image(systemName: "xmark")
-                                    .font(.title2)
-                                    .foregroundColor(.white)
-                                    .padding()
-                                    .background(Color.black.opacity(0.5))
-                                    .clipShape(Circle())
-                            }
-                            .padding()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                            .allowsHitTesting(true)
-                            .zIndex(10)
-                            , alignment: .topTrailing
-                        )
+            if let currentItem {
+                if currentItem.type == .video {
+                    videoBody(for: currentItem)
                 } else {
-                    Text("加载中...")
-                        .foregroundColor(.white)
+                    imageBody
                 }
             } else {
-                // Image viewer with swipe support
-                TabView(selection: $currentIndex) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                        ImageViewer(item: item, scale: $scale)
-                            .tag(index)
-                    }
-                }
-                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
-                .onAppear {
-                    startTime = Date()
-                    startTimer()
-                }
-                .onDisappear {
-                    stopTimer()
-                }
-                .overlay(
-                    Button(action: {
-                        dismiss()
-                    }) {
-                        Image(systemName: "xmark")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.black.opacity(0.5))
-                            .clipShape(Circle())
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                    , alignment: .topTrailing
-                )
+                Text("内容不存在")
+                    .foregroundColor(.white)
             }
         }
         .navigationBarHidden(true)
         .onAppear {
-            // Configure Audio Session once for the entire session
-            do {
-                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback)
-                try AVAudioSession.sharedInstance().setActive(true)
-            } catch {
-                print("Failed to set audio session category: \(error)")
-            }
-
-            currentIndex = initialIndex
-            if currentItem.type == .video {
-                setupVideoPlayer()
-            }
+            currentIndex = min(max(initialIndex, 0), max(items.count - 1, 0))
+            configureCurrentItem()
+            startTimer()
         }
-        .onChange(of: currentIndex) { newIndex in
-            if currentItem.type == .video {
-                stopTimer()
-                setupVideoPlayer()
-                startTime = Date()
-                startTimer()
+        .onDisappear {
+            stopTimer()
+            videoController.stop()
+        }
+        .onChange(of: currentIndex) { _ in
+            configureCurrentItem()
+        }
+        .onChange(of: scenePhase) { phase in
+            if phase == .active {
+                AudioSessionManager.shared.activate()
+                videoController.resumeIfNeeded()
+            } else if phase == .background {
+                videoController.pauseForBackground()
             }
         }
     }
 
-    private func setupVideoPlayer() {
-        player?.pause()
-        player = nil
-        playerViewController = nil
+    private func videoBody(for item: ContentItem) -> some View {
+        ZStack {
+            PlayerViewControllerRepresentable(player: videoController.player)
+                .ignoresSafeArea()
 
-        // Remove existing observer
-        if let observer = playerItemObserver {
-            NotificationCenter.default.removeObserver(observer)
-            playerItemObserver = nil
-        }
-
-        if let url = URL(string: currentItem.validURI) {
-            let playerItem = AVPlayerItem(url: url)
-            // Use .timeDomain pitch algorithm to help with audio/video synchronization
-            playerItem.audioTimePitchAlgorithm = .timeDomain
-
-            player = AVPlayer(playerItem: playerItem)
-            player?.automaticallyWaitsToMinimizeStalling = true
-
-            playerViewController = AVPlayerViewController()
-            playerViewController?.player = player
-            playerViewController?.allowsPictureInPicturePlayback = false
-            playerViewController?.showsPlaybackControls = true
-            if #available(iOS 16.0, *) {
-                playerViewController?.speeds = []
+            if videoController.isLoading {
+                ProgressView()
+                    .tint(.white)
+                    .scaleEffect(1.4)
             }
-            player?.play()
 
-            // Observe playback completion and save reference
-            playerItemObserver = NotificationCenter.default.addObserver(
-                forName: .AVPlayerItemDidPlayToEndTime,
-                object: player?.currentItem,
-                queue: .main
-            ) { _ in
+            if let errorMessage = videoController.errorMessage {
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.title)
+                    Text(errorMessage)
+                        .font(.body)
+                        .multilineTextAlignment(.center)
+                    Button("关闭") {
+                        dismiss()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .foregroundColor(.white)
+                .padding(24)
+                .background(Color.black.opacity(0.72))
+                .cornerRadius(12)
+                .padding()
+            }
+
+            closeButton
+        }
+        .onAppear {
+            videoController.load(item: item) {
                 dismiss()
             }
         }
     }
 
+    private var imageBody: some View {
+        TabView(selection: $currentIndex) {
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                if item.type == .image {
+                    ImageViewer(item: item, scale: $scale)
+                        .tag(index)
+                } else {
+                    ZStack {
+                        Color.black
+                        Image(systemName: "video.fill")
+                            .font(.largeTitle)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    .tag(index)
+                }
+            }
+        }
+        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .automatic))
+        .overlay(closeButton, alignment: .topTrailing)
+    }
+
+    private var closeButton: some View {
+        Button(action: {
+            dismiss()
+        }) {
+            Image(systemName: "xmark")
+                .font(.title2)
+                .foregroundColor(.white)
+                .padding()
+                .background(Color.black.opacity(0.5))
+                .clipShape(Circle())
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+    }
+
+    private func configureCurrentItem() {
+        guard let currentItem else { return }
+        scale = 1.0
+        if currentItem.type == .video {
+            videoController.load(item: currentItem) {
+                dismiss()
+            }
+        } else {
+            videoController.stop()
+        }
+    }
+
     private func startTimer() {
-        // Ensure any existing timer is invalidated before starting a new one
         timer?.invalidate()
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            store.incrementUsedTime(seconds: 1)
+            Task { @MainActor in
+                store.incrementUsedTime(seconds: 1)
+            }
         }
     }
 
     private func stopTimer() {
         timer?.invalidate()
         timer = nil
-        // Remove observer
-        if let observer = playerItemObserver {
-            NotificationCenter.default.removeObserver(observer)
-            playerItemObserver = nil
+    }
+}
+
+final class VideoPlayerController: ObservableObject {
+    let player = AVPlayer()
+
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+
+    private var currentItemID: String?
+    private var shouldResumeAfterBackground = false
+    private var statusObservation: NSKeyValueObservation?
+    private var endObserver: NSObjectProtocol?
+    private var failedObserver: NSObjectProtocol?
+    private var stalledObserver: NSObjectProtocol?
+    private var finishHandler: (() -> Void)?
+
+    func load(item: ContentItem, onFinish: @escaping () -> Void) {
+        guard currentItemID != item.id else { return }
+        guard let url = item.validFileURL else {
+            stop()
+            errorMessage = "视频文件路径无效"
+            isLoading = false
+            return
         }
-        player?.pause()
-        player = nil
-        playerViewController = nil
+
+        currentItemID = item.id
+        finishHandler = onFinish
+        errorMessage = nil
+        isLoading = true
+        removeObservers()
+
+        AudioSessionManager.shared.configureForPlayback { [weak self] in
+            self?.resumeIfNeeded()
+        }
+
+        let playerItem = AVPlayerItem(url: url)
+        statusObservation = playerItem.observe(\.status, options: [.initial, .new]) { [weak self] observedItem, _ in
+            DispatchQueue.main.async {
+                self?.handleStatusChange(observedItem)
+            }
+        }
+
+        endObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: playerItem,
+            queue: .main
+        ) { [weak self] _ in
+            self?.finishHandler?()
+        }
+
+        failedObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime,
+            object: playerItem,
+            queue: .main
+        ) { [weak self] notification in
+            let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
+            self?.showPlaybackError(error)
+        }
+
+        stalledObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemPlaybackStalled,
+            object: playerItem,
+            queue: .main
+        ) { [weak self] _ in
+            self?.player.play()
+        }
+
+        player.automaticallyWaitsToMinimizeStalling = true
+        player.replaceCurrentItem(with: playerItem)
+    }
+
+    func stop() {
+        shouldResumeAfterBackground = false
+        currentItemID = nil
+        player.pause()
+        player.replaceCurrentItem(with: nil)
+        removeObservers()
+        isLoading = false
+    }
+
+    func pauseForBackground() {
+        shouldResumeAfterBackground = player.timeControlStatus == .playing
+        player.pause()
+    }
+
+    func resumeIfNeeded() {
+        guard player.currentItem != nil else { return }
+        AudioSessionManager.shared.activate()
+        if shouldResumeAfterBackground || player.timeControlStatus != .playing {
+            shouldResumeAfterBackground = false
+            player.play()
+        }
+    }
+
+    deinit {
+        stop()
+    }
+
+    private func handleStatusChange(_ item: AVPlayerItem) {
+        switch item.status {
+        case .readyToPlay:
+            isLoading = false
+            AudioSessionManager.shared.activate()
+            player.play()
+        case .failed:
+            showPlaybackError(item.error)
+        case .unknown:
+            isLoading = true
+        @unknown default:
+            showPlaybackError(nil)
+        }
+    }
+
+    private func showPlaybackError(_ error: Error?) {
+        isLoading = false
+        errorMessage = error?.localizedDescription ?? "视频无法播放，请重新导入该文件"
+    }
+
+    private func removeObservers() {
+        statusObservation?.invalidate()
+        statusObservation = nil
+
+        if let endObserver {
+            NotificationCenter.default.removeObserver(endObserver)
+            self.endObserver = nil
+        }
+        if let failedObserver {
+            NotificationCenter.default.removeObserver(failedObserver)
+            self.failedObserver = nil
+        }
+        if let stalledObserver {
+            NotificationCenter.default.removeObserver(stalledObserver)
+            self.stalledObserver = nil
+        }
     }
 }
 
@@ -185,54 +305,51 @@ struct ImageViewer: View {
 
     var body: some View {
         ScrollView([.horizontal, .vertical], showsIndicators: false) {
-            AsyncImage(url: URL(string: item.validURI)) { phase in
-                switch phase {
-                case .empty:
-                    ProgressView()
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: UIScreen.main.bounds.width, maxHeight: UIScreen.main.bounds.height)
-                        .scaleEffect(scale)
-                        .gesture(
-                            MagnificationGesture()
-                                .onChanged { value in
-                                    self.scale = value
-                                }
-                                .onEnded { _ in
-                                    withAnimation {
-                                        if scale < 1 {
-                                            scale = 1
-                                        }
-                                    }
-                                }
-                        )
-                case .failure:
-                    Image(systemName: "photo")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                @unknown default:
-                    EmptyView()
-                }
+            LocalImageView(
+                url: item.validFileURL,
+                targetSize: UIScreen.main.bounds.size,
+                contentMode: .fit
+            ) {
+                ProgressView()
+                    .tint(.white)
             }
             .frame(maxWidth: UIScreen.main.bounds.width, maxHeight: UIScreen.main.bounds.height)
+            .scaleEffect(scale)
+            .gesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        scale = value
+                    }
+                    .onEnded { _ in
+                        withAnimation {
+                            if scale < 1 {
+                                scale = 1
+                            }
+                        }
+                    }
+            )
         }
+        .frame(maxWidth: UIScreen.main.bounds.width, maxHeight: UIScreen.main.bounds.height)
     }
 }
 
 struct PlayerViewControllerRepresentable: UIViewControllerRepresentable {
-    let playerViewController: AVPlayerViewController
+    let player: AVPlayer
 
     func makeUIViewController(context: Context) -> AVPlayerViewController {
-        playerViewController.player?.play() // Reinforce playback when UI is ready
-        return playerViewController
+        let controller = AVPlayerViewController()
+        controller.player = player
+        controller.allowsPictureInPicturePlayback = false
+        controller.showsPlaybackControls = true
+        if #available(iOS 16.0, *) {
+            controller.speeds = []
+        }
+        return controller
     }
 
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        // Ensure the correct player is used
-        if uiViewController.player != playerViewController.player {
-            uiViewController.player = playerViewController.player
+        if uiViewController.player !== player {
+            uiViewController.player = player
         }
     }
 }

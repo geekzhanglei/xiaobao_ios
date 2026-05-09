@@ -1,8 +1,9 @@
 import SwiftUI
 import PhotosUI
+import UniformTypeIdentifiers
 
 struct VideoPicker: UIViewControllerRepresentable {
-    let onVideosPicked: ([URL]) -> Void
+    let onVideosPicked: ([PickedMediaFile]) -> Void
 
     func makeUIViewController(context: Context) -> PHPickerViewController {
         var configuration = PHPickerConfiguration()
@@ -21,9 +22,9 @@ struct VideoPicker: UIViewControllerRepresentable {
     }
 
     class Coordinator: NSObject, PHPickerViewControllerDelegate {
-        let onVideosPicked: ([URL]) -> Void
+        let onVideosPicked: ([PickedMediaFile]) -> Void
 
-        init(onVideosPicked: @escaping ([URL]) -> Void) {
+        init(onVideosPicked: @escaping ([PickedMediaFile]) -> Void) {
             self.onVideosPicked = onVideosPicked
         }
 
@@ -35,8 +36,9 @@ struct VideoPicker: UIViewControllerRepresentable {
                 return
             }
 
-            var pickedURLs: [URL] = []
+            var pickedFiles: [PickedMediaFile] = []
             let group = DispatchGroup()
+            let lock = NSLock()
 
             for result in results {
                 group.enter()
@@ -45,10 +47,18 @@ struct VideoPicker: UIViewControllerRepresentable {
                     
                     if let url = url {
                         do {
-                            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                            let destination = documentsPath.appendingPathComponent(UUID().uuidString + ".mp4")
-                            try FileManager.default.copyItem(at: url, to: destination)
-                            pickedURLs.append(destination)
+                            let contentID = UUID().uuidString
+                            let suggestedName = result.itemProvider.suggestedName
+                            let destination = try MediaStorage.storeImportedFile(
+                                from: url,
+                                kind: .video,
+                                contentID: contentID,
+                                preferredFilename: suggestedName
+                            )
+                            let title = suggestedName ?? "视频"
+                            lock.lock()
+                            pickedFiles.append(PickedMediaFile(id: contentID, url: destination, title: title))
+                            lock.unlock()
                         } catch {
                             print("Error copying picked video: \(error)")
                         }
@@ -57,7 +67,7 @@ struct VideoPicker: UIViewControllerRepresentable {
             }
 
             group.notify(queue: .main) {
-                self.onVideosPicked(pickedURLs)
+                self.onVideosPicked(pickedFiles)
             }
         }
     }

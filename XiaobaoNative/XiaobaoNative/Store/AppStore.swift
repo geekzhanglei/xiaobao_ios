@@ -2,13 +2,16 @@ import Foundation
 import Combine
 import SwiftUI
 
+@MainActor
 class AppStore: ObservableObject {
     @Published var content: [ContentItem] = []
+    @Published private(set) var contentByCategory: [String: [ContentItem]] = [:]
     @Published var categories: [String] = []
     @Published var learningState: LearningState = LearningState()
 
     private let db = DatabaseManager.shared
     private let categoryCacheKey = "xiaobao.customCategories"
+    private var thumbnailRepairIDs = Set<String>()
 
     init() {
         checkMidnightReset()
@@ -45,6 +48,8 @@ class AppStore: ObservableObject {
 
     func loadContent() {
         content = db.getAllContent()
+        rebuildContentByCategory()
+        repairMissingThumbnailsIfNeeded()
     }
 
     func loadCategories() {
@@ -89,10 +94,16 @@ class AppStore: ObservableObject {
         
         print("AppStore: 批量添加 \(items.count) 个内容")
         
+        var nextSortIndexByCategory = Dictionary(grouping: content, by: \.category).mapValues { items in
+            (items.map(\.sortIndex).max() ?? -1) + 1
+        }
+
         // Normalize paths to relative format before saving to DB for stability
         let normalizedItems = items.map { item -> ContentItem in
-            var newItem = item
-            newItem = ContentItem(
+            let sortIndex = nextSortIndexByCategory[item.category] ?? 0
+            nextSortIndexByCategory[item.category] = sortIndex + 1
+
+            return ContentItem(
                 id: item.id,
                 type: item.type,
                 title: item.title,
@@ -100,9 +111,8 @@ class AppStore: ObservableObject {
                 uri: toRelativePath(item.uri) ?? item.uri,
                 category: item.category,
                 duration: item.duration,
-                sortIndex: item.sortIndex
+                sortIndex: sortIndex
             )
-            return newItem
         }
 
         // Cache categories first (fast)
@@ -126,12 +136,18 @@ class AppStore: ObservableObject {
     }
 
     func deleteContent(id: String) {
+        if let item = content.first(where: { $0.id == id }) {
+            MediaStorage.deleteFiles(for: item)
+        }
         db.deleteContent(id: id)
         loadContent()
     }
 
     func deleteAllData() {
+        content.forEach { MediaStorage.deleteFiles(for: $0) }
         db.deleteAllContent()
+        MediaStorage.clearManagedMedia()
+        thumbnailRepairIDs.removeAll()
         loadContent()
     }
 
@@ -144,11 +160,9 @@ class AppStore: ObservableObject {
             categoryContent[index].sortIndex = index
         }
 
-        // Update DB
-        db.updateContentIndices(items: categoryContent)
-
-        // Reload
-        loadContent()
+        db.updateContentIndices(items: categoryContent) { [weak self] in
+            self?.loadContent()
+        }
     }
 
     func moveCategory(from source: IndexSet, to destination: Int) {
@@ -249,18 +263,51 @@ class AppStore: ObservableObject {
             return path
         }
         
-        let pathString = url.path
-        let filename = url.lastPathComponent
-        
-        if pathString.contains("/Library/Application Support/") || pathString.contains("/Thumbnails/") {
-            return "appsupport://Thumbnails/\(filename)"
+        return MediaStorage.relativePath(for: url)
+    }
+
+    private func rebuildContentByCategory() {
+        contentByCategory = Dictionary(grouping: content, by: \.category).mapValues { items in
+            items.sorted {
+                if $0.sortIndex != $1.sortIndex {
+                    return $0.sortIndex < $1.sortIndex
+                }
+                return $0.id < $1.id
+            }
         }
-        
-        if pathString.contains("/Documents/") {
-            return "documents://\(filename)"
+    }
+
+    private func repairMissingThumbnailsIfNeeded() {
+        let candidates = content.filter { item in
+            guard item.type == .video, !thumbnailRepairIDs.contains(item.id), item.validFileURL != nil else {
+                return false
+            }
+            if let coverURL = item.validCoverFileURL, FileManager.default.fileExists(atPath: coverURL.path) {
+                return false
+            }
+            return true
         }
-        
-        return path
+
+        guard !candidates.isEmpty else { return }
+        candidates.forEach { thumbnailRepairIDs.insert($0.id) }
+
+        DispatchQueue.global(qos: .utility).async {
+            let repaired = candidates.compactMap { item -> (String, String)? in
+                guard let thumbnailURL = VideoThumbnailGenerator.generateThumbnailIfNeeded(for: item) else {
+                    return nil
+                }
+                return (item.id, MediaStorage.relativePath(for: thumbnailURL))
+            }
+
+            guard !repaired.isEmpty else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                for (id, cover) in repaired {
+                    self.db.updateContentCover(id: id, cover: cover)
+                }
+                self.loadContent()
+            }
+        }
     }
 
     private func mergeCategories(_ groups: [String]...) -> [String] {

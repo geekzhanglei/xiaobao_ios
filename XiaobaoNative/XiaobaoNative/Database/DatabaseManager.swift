@@ -42,7 +42,11 @@ class DatabaseManager {
 
     func getAllContent() -> [ContentItem] {
         let request: NSFetchRequest<NSManagedObject> = NSFetchRequest(entityName: "ContentEntity")
-        request.sortDescriptors = [NSSortDescriptor(key: "sortIndex", ascending: true)]
+        request.sortDescriptors = [
+            NSSortDescriptor(key: "category", ascending: true),
+            NSSortDescriptor(key: "sortIndex", ascending: true),
+            NSSortDescriptor(key: "id", ascending: true)
+        ]
 
         do {
             let entities = try context.fetch(request)
@@ -109,21 +113,52 @@ class DatabaseManager {
         }
     }
 
-    func updateContentIndices(items: [ContentItem]) {
-        for item in items {
+    func updateContentIndices(items: [ContentItem], completion: (() -> Void)? = nil) {
+        guard !items.isEmpty else {
+            completion?()
+            return
+        }
+
+        let indexByID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0.sortIndex) })
+
+        persistentContainer.performBackgroundTask { context in
             let request: NSFetchRequest<NSManagedObject> = NSFetchRequest(entityName: "ContentEntity")
-            request.predicate = NSPredicate(format: "id == %@", item.id)
-            
+            request.predicate = NSPredicate(format: "id IN %@", Array(indexByID.keys))
+
             do {
                 let entities = try context.fetch(request)
-                if let entity = entities.first {
-                    entity.setValue(item.sortIndex, forKey: "sortIndex")
+                for entity in entities {
+                    guard let id = entity.value(forKey: "id") as? String, let sortIndex = indexByID[id] else {
+                        continue
+                    }
+                    entity.setValue(sortIndex, forKey: "sortIndex")
+                }
+                if context.hasChanges {
+                    try context.save()
                 }
             } catch {
-                print("Error updating content index for \(item.id): \(error)")
+                print("Error updating content indices: \(error)")
+            }
+
+            DispatchQueue.main.async {
+                completion?()
             }
         }
-        save()
+    }
+
+    func updateContentCover(id: String, cover: String) {
+        let request: NSFetchRequest<NSManagedObject> = NSFetchRequest(entityName: "ContentEntity")
+        request.predicate = NSPredicate(format: "id == %@", id)
+
+        do {
+            let entities = try context.fetch(request)
+            if let entity = entities.first {
+                entity.setValue(cover, forKey: "cover")
+                save()
+            }
+        } catch {
+            print("Error updating content cover for \(id): \(error)")
+        }
     }
 
     func deleteContent(id: String) {

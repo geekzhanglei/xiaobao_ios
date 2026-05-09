@@ -2,7 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct DocumentPicker: UIViewControllerRepresentable {
-    let onDocumentsPicked: ([URL]) -> Void
+    let onDocumentsPicked: ([PickedMediaFile]) -> Void
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.movie], asCopy: true)
@@ -18,31 +18,41 @@ struct DocumentPicker: UIViewControllerRepresentable {
     }
 
     class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let onDocumentsPicked: ([URL]) -> Void
+        let onDocumentsPicked: ([PickedMediaFile]) -> Void
 
-        init(onDocumentsPicked: @escaping ([URL]) -> Void) {
+        init(onDocumentsPicked: @escaping ([PickedMediaFile]) -> Void) {
             self.onDocumentsPicked = onDocumentsPicked
         }
 
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            var destinationURLs: [URL] = []
-            
-            for url in urls {
-                do {
-                    let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                    let destination = documentsPath.appendingPathComponent(url.lastPathComponent)
+            DispatchQueue.global(qos: .userInitiated).async {
+                var destinationFiles: [PickedMediaFile] = []
 
-                    if FileManager.default.fileExists(atPath: destination.path) {
-                        try FileManager.default.removeItem(at: destination)
+                for url in urls {
+                    do {
+                        let isSecurityScoped = url.startAccessingSecurityScopedResource()
+                        defer {
+                            if isSecurityScoped {
+                                url.stopAccessingSecurityScopedResource()
+                            }
+                        }
+                        let contentID = UUID().uuidString
+                        let destination = try MediaStorage.storeImportedFile(
+                            from: url,
+                            kind: .video,
+                            contentID: contentID,
+                            preferredFilename: url.lastPathComponent
+                        )
+                        destinationFiles.append(PickedMediaFile(id: contentID, url: destination, title: url.lastPathComponent))
+                    } catch {
+                        print("Error copying picked document: \(error)")
                     }
-                    try FileManager.default.copyItem(at: url, to: destination)
-                    destinationURLs.append(destination)
-                } catch {
-                    print("Error copying picked document: \(error)")
+                }
+
+                DispatchQueue.main.async {
+                    self.onDocumentsPicked(destinationFiles)
                 }
             }
-            
-            self.onDocumentsPicked(destinationURLs)
         }
 
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {

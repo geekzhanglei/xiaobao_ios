@@ -6,24 +6,11 @@ struct ContentCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack {
-                let coverURL = item.validCover ?? (item.type == .image ? item.validURI : nil)
+                let coverURL = item.validCoverFileURL ?? (item.type == .image ? item.validFileURL : nil)
                 if let coverURL = coverURL {
-                    AsyncImage(url: URL(string: coverURL)) { phase in
-                        switch phase {
-                        case .empty:
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                        case .failure:
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                        @unknown default:
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.3))
-                        }
+                    LocalImageView(url: coverURL, targetSize: CGSize(width: 150, height: 120), contentMode: .fill) {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.3))
                     }
                 } else {
                     Rectangle()

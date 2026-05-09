@@ -1,6 +1,6 @@
 import Foundation
 
-struct LearningState: Codable, Equatable {
+nonisolated struct LearningState: Codable, Equatable, Sendable {
     var usedTime: Int
     var limit: Int
     var locked: Bool

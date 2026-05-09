@@ -1,11 +1,11 @@
 import Foundation
 
-enum ContentType: String, Codable {
+nonisolated enum ContentType: String, Codable, Sendable {
     case video = "video"
     case image = "image"
 }
 
-struct ContentItem: Codable, Identifiable, Equatable {
+nonisolated struct ContentItem: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let type: ContentType
     let title: String?
@@ -17,14 +17,27 @@ struct ContentItem: Codable, Identifiable, Equatable {
     
     var validCover: String? {
         guard let cover = cover else { return nil }
-        return resolvePath(cover)
+        return validCoverFileURL?.absoluteString ?? cover
     }
 
     var validURI: String {
-        return resolvePath(uri) ?? uri
+        return validFileURL?.absoluteString ?? uri
+    }
+
+    var validFileURL: URL? {
+        MediaStorage.resolvePath(uri)
+    }
+
+    var validCoverFileURL: URL? {
+        guard let cover = cover else { return nil }
+        return MediaStorage.resolvePath(cover)
     }
 
     private func resolvePath(_ path: String) -> String? {
+        if let resolved = MediaStorage.resolvePath(path) {
+            return resolved.absoluteString
+        }
+
         // Handle relative path schemes
         if path.hasPrefix("documents://") {
             let filename = path.replacingOccurrences(of: "documents://", with: "")

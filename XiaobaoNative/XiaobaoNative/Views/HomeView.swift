@@ -22,7 +22,7 @@ struct HomeView: View {
                 })
             } else {
                 ScrollView {
-                    VStack(spacing: 20) {
+                    LazyVStack(spacing: 20) {
                         ForEach(store.categories, id: \.self) { category in
                             VStack(alignment: .leading, spacing: 10) {
                                 Text(category)
@@ -30,9 +30,9 @@ struct HomeView: View {
                                     .foregroundColor(.white)
                                     .padding(.horizontal)
 
-                                let categoryItems = store.content.filter { $0.category == category }
+                                let categoryItems = store.contentByCategory[category] ?? []
                                 ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 20) { // Increased spacing for better isolation
+                                    LazyHStack(spacing: 20) {
                                         ForEach(Array(categoryItems.enumerated()), id: \.element.id) { index, item in
                                             Button(action: {
                                                 selectedPlayerItems = categoryItems
@@ -107,6 +107,9 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showParentView) {
             ParentView()
+        }
+        .onAppear {
+            currentThemeColor = store.learningState.themeColor
         }
     }
 }

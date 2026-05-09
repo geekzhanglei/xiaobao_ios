@@ -1,8 +1,9 @@
 import SwiftUI
 import PhotosUI
+import UniformTypeIdentifiers
 
 struct ImagePicker: UIViewControllerRepresentable {
-    let onImagesPicked: ([URL]) -> Void
+    let onImagesPicked: ([PickedMediaFile]) -> Void
 
     func makeUIViewController(context: Context) -> PHPickerViewController {
         var configuration = PHPickerConfiguration()
@@ -21,9 +22,9 @@ struct ImagePicker: UIViewControllerRepresentable {
     }
 
     class Coordinator: NSObject, PHPickerViewControllerDelegate {
-        let onImagesPicked: ([URL]) -> Void
+        let onImagesPicked: ([PickedMediaFile]) -> Void
 
-        init(onImagesPicked: @escaping ([URL]) -> Void) {
+        init(onImagesPicked: @escaping ([PickedMediaFile]) -> Void) {
             self.onImagesPicked = onImagesPicked
         }
 
@@ -35,8 +36,9 @@ struct ImagePicker: UIViewControllerRepresentable {
                 return
             }
 
-            var pickedURLs: [URL] = []
+            var pickedFiles: [PickedMediaFile] = []
             let group = DispatchGroup()
+            let lock = NSLock()
 
             for result in results {
                 group.enter()
@@ -45,10 +47,18 @@ struct ImagePicker: UIViewControllerRepresentable {
                     
                     if let url = url {
                         do {
-                            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-                            let destination = documentsPath.appendingPathComponent(UUID().uuidString + ".jpg")
-                            try FileManager.default.copyItem(at: url, to: destination)
-                            pickedURLs.append(destination)
+                            let contentID = UUID().uuidString
+                            let suggestedName = result.itemProvider.suggestedName
+                            let destination = try MediaStorage.storeImportedFile(
+                                from: url,
+                                kind: .image,
+                                contentID: contentID,
+                                preferredFilename: suggestedName
+                            )
+                            let title = suggestedName ?? "图片"
+                            lock.lock()
+                            pickedFiles.append(PickedMediaFile(id: contentID, url: destination, title: title))
+                            lock.unlock()
                         } catch {
                             print("Error copying picked image: \(error)")
                         }
@@ -57,7 +67,7 @@ struct ImagePicker: UIViewControllerRepresentable {
             }
 
             group.notify(queue: .main) {
-                self.onImagesPicked(pickedURLs)
+                self.onImagesPicked(pickedFiles)
             }
         }
     }

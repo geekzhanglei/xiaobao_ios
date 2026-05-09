@@ -21,7 +21,7 @@ struct ParentView: View {
     private let selectedCategoryKey = "xiaobao.selectedCategory"
 
     private var contentByCategory: [String: [ContentItem]] {
-        Dictionary(grouping: store.content) { $0.category }
+        store.contentByCategory
     }
 
     private var trimmedCategoryName: String {
@@ -228,21 +228,14 @@ struct ParentView: View {
                         } else {
                             ForEach(items, id: \.id) { item in
                                 HStack(spacing: 12) {
-                                    let thumbnailURL = item.validCover ?? (item.type == .image ? item.validURI : nil)
+                                    let thumbnailURL = item.validCoverFileURL ?? (item.type == .image ? item.validFileURL : nil)
                                     if let thumbnailURL = thumbnailURL {
-                                        AsyncImage(url: URL(string: thumbnailURL)) { phase in
-                                            switch phase {
-                                            case .empty:
-                                                ProgressView()
-                                                    .frame(width: 50, height: 50)
-                                            case .success(let image):
-                                                image.resizable().aspectRatio(contentMode: .fill)
-                                                    .frame(width: 50, height: 50).cornerRadius(8)
-                                            case .failure:
-                                                Image(systemName: "photo").frame(width: 50, height: 50).background(Color.gray.opacity(0.3)).cornerRadius(8)
-                                            @unknown default: EmptyView()
-                                            }
+                                        LocalImageView(url: thumbnailURL, targetSize: CGSize(width: 50, height: 50), contentMode: .fill) {
+                                            ProgressView()
+                                                .frame(width: 50, height: 50)
                                         }
+                                        .frame(width: 50, height: 50)
+                                        .cornerRadius(8)
                                     } else {
                                         Image(systemName: item.type == .video ? "video" : "photo")
                                             .frame(width: 50, height: 50).background(Color.gray.opacity(0.3)).cornerRadius(8)
@@ -286,39 +279,37 @@ struct ParentView: View {
         .navigationViewStyle(StackNavigationViewStyle())
         .sheet(isPresented: $showImagePicker) {
             let targetCategory = categoryForPicker
-            ImagePicker { urls in
-                if urls.isEmpty { return }
+            ImagePicker { files in
+                if files.isEmpty { return }
                 isProcessing = true
-                DispatchQueue.global(qos: .userInitiated).async {
-                    let items = urls.map { url in
-                        ContentItem(
-                            type: .image,
-                            title: "图片",
-                            uri: url.absoluteString,
-                            category: targetCategory
-                        )
-                    }
-                    DispatchQueue.main.async {
-                        store.addContents(items) {
-                            isProcessing = false
-                        }
-                    }
+                let items = files.map { file in
+                    ContentItem(
+                        id: file.id,
+                        type: .image,
+                        title: file.title,
+                        uri: MediaStorage.relativePath(for: file.url),
+                        category: targetCategory
+                    )
+                }
+                store.addContents(items) {
+                    isProcessing = false
                 }
             }
         }
         .sheet(isPresented: $showVideoPicker) {
             let targetCategory = categoryForPicker
-            VideoPicker { urls in
-                if urls.isEmpty { return }
+            VideoPicker { files in
+                if files.isEmpty { return }
                 isProcessing = true
                 DispatchQueue.global(qos: .userInitiated).async {
-                    let items = urls.map { url in
-                        let thumbnailURL = VideoThumbnailGenerator.generateThumbnail(from: url)
+                    let items = files.map { file in
+                        let thumbnailURL = VideoThumbnailGenerator.generateThumbnail(from: file.url, contentID: file.id)
                         return ContentItem(
+                            id: file.id,
                             type: .video,
-                            title: "视频",
-                            cover: thumbnailURL?.absoluteString,
-                            uri: url.absoluteString,
+                            title: file.title,
+                            cover: thumbnailURL.map { MediaStorage.relativePath(for: $0) },
+                            uri: MediaStorage.relativePath(for: file.url),
                             category: targetCategory
                         )
                     }
@@ -332,17 +323,18 @@ struct ParentView: View {
         }
         .sheet(isPresented: $showDocumentPicker) {
             let targetCategory = categoryForPicker
-            DocumentPicker { urls in
-                if urls.isEmpty { return }
+            DocumentPicker { files in
+                if files.isEmpty { return }
                 isProcessing = true
                 DispatchQueue.global(qos: .userInitiated).async {
-                    let items = urls.map { url in
-                        let thumbnailURL = VideoThumbnailGenerator.generateThumbnail(from: url)
+                    let items = files.map { file in
+                        let thumbnailURL = VideoThumbnailGenerator.generateThumbnail(from: file.url, contentID: file.id)
                         return ContentItem(
+                            id: file.id,
                             type: .video,
-                            title: url.lastPathComponent,
-                            cover: thumbnailURL?.absoluteString,
-                            uri: url.absoluteString,
+                            title: file.title,
+                            cover: thumbnailURL.map { MediaStorage.relativePath(for: $0) },
+                            uri: MediaStorage.relativePath(for: file.url),
                             category: targetCategory
                         )
                     }

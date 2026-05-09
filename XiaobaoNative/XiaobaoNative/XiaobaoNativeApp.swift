@@ -11,6 +11,9 @@ struct XiaobaoNativeApp: App {
             }
             .navigationViewStyle(StackNavigationViewStyle())
             .environmentObject(store)
+            .onAppear {
+                AudioSessionManager.shared.configureForPlayback()
+            }
         }
     }
 }
