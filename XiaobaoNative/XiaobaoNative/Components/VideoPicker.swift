@@ -9,6 +9,7 @@ struct VideoPicker: UIViewControllerRepresentable {
         var configuration = PHPickerConfiguration()
         configuration.filter = .videos
         configuration.selectionLimit = 0 // 0 means no limit
+        configuration.preferredAssetRepresentationMode = .current
 
         let picker = PHPickerViewController(configuration: configuration)
         picker.delegate = context.coordinator

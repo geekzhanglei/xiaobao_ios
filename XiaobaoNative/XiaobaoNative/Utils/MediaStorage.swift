@@ -34,8 +34,11 @@ nonisolated enum MediaStorage {
         let directory = kind == .video ? videosURL : imagesURL
         try ensureDirectoryExists(directory)
 
-        let extensionSource = preferredFilename ?? sourceURL.lastPathComponent
-        let fileExtension = normalizedFileExtension(from: extensionSource, fallback: kind == .video ? "mov" : "jpg")
+        let fileExtension = storedFileExtension(
+            sourceURL: sourceURL,
+            preferredFilename: preferredFilename,
+            fallback: kind == .video ? "mov" : "jpg"
+        )
         let destination = directory.appendingPathComponent(contentID).appendingPathExtension(fileExtension)
 
         if fileManager.fileExists(atPath: destination.path) {
@@ -135,6 +138,19 @@ nonisolated enum MediaStorage {
     private static func normalizedFileExtension(from filename: String, fallback: String) -> String {
         let ext = URL(fileURLWithPath: filename).pathExtension
         return ext.isEmpty ? fallback : ext.lowercased()
+    }
+
+    private static func storedFileExtension(sourceURL: URL, preferredFilename: String?, fallback: String) -> String {
+        let sourceExtension = sourceURL.pathExtension
+        if !sourceExtension.isEmpty {
+            return sourceExtension.lowercased()
+        }
+
+        if let preferredFilename {
+            return normalizedFileExtension(from: preferredFilename, fallback: fallback)
+        }
+
+        return fallback
     }
 
     private static func deleteManagedFile(at url: URL?) {

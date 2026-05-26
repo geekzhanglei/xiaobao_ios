@@ -10,7 +10,7 @@ struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var videoController = VideoPlayerController()
-    @State private var timer: Timer?
+    @StateObject private var usageTracker = UsageTimeTracker()
     @State private var scale: CGFloat = 1.0
     @State private var currentIndex: Int = 0
 
@@ -151,17 +151,51 @@ struct PlayerView: View {
     }
 
     private func startTimer() {
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in
-            Task { @MainActor in
-                store.incrementUsedTime(seconds: 1)
-            }
+        usageTracker.start { seconds in
+            store.incrementUsedTime(seconds: seconds)
         }
     }
 
     private func stopTimer() {
+        usageTracker.stop { seconds in
+            store.incrementUsedTime(seconds: seconds)
+        }
+    }
+}
+
+@MainActor
+final class UsageTimeTracker: ObservableObject {
+    private let flushInterval = 10
+    private var timer: Timer?
+    private var pendingSeconds = 0
+
+    func start(onFlush: @escaping (Int) -> Void) {
+        stop(onFlush: onFlush)
+
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.pendingSeconds += 1
+                if self.pendingSeconds >= self.flushInterval {
+                    self.flush(onFlush: onFlush)
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+
+    func stop(onFlush: (Int) -> Void) {
         timer?.invalidate()
         timer = nil
+        flush(onFlush: onFlush)
+    }
+
+    private func flush(onFlush: (Int) -> Void) {
+        guard pendingSeconds > 0 else { return }
+        let seconds = pendingSeconds
+        pendingSeconds = 0
+        onFlush(seconds)
     }
 }
 
@@ -198,7 +232,11 @@ final class VideoPlayerController: ObservableObject {
             self?.resumeIfNeeded()
         }
 
-        let playerItem = AVPlayerItem(url: url)
+        let asset = AVURLAsset(
+            url: url,
+            options: [AVURLAssetPreferPreciseDurationAndTimingKey: true]
+        )
+        let playerItem = AVPlayerItem(asset: asset)
         statusObservation = playerItem.observe(\.status, options: [.initial, .new]) { [weak self] observedItem, _ in
             DispatchQueue.main.async {
                 self?.handleStatusChange(observedItem)
